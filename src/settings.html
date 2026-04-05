@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>DayCal Settings</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --accent:#FF8FAB;--bg:#ffffff;--surface:#f7f5f2;--border:#e8e4de;
+  --text:#1a1a2e;--text2:#8888aa;
+  --font:'Microsoft YaHei','PingFang SC','Segoe UI',sans-serif;
+}
+.dark{--bg:#16161e;--surface:#1e1e2e;--border:#2e2e48;--text:#f0eee8;--text2:#8a8aa8;}
+html,body{width:100%;height:100%;background:var(--bg);font-family:var(--font);color:var(--text);overflow:hidden;transition:background 0.2s,color 0.2s;}
+
+#tb{height:40px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:8px;-webkit-app-region:drag;flex-shrink:0;}
+.tl{width:12px;height:12px;border-radius:50%;border:none;cursor:pointer;-webkit-app-region:no-drag;transition:filter 0.1s;}
+.tl:hover{filter:brightness(0.82);}
+.tl-c{background:#ff5f57;}.tl-d{background:#e0e0e0;}
+.tb-title{flex:1;text-align:center;font-size:13px;font-weight:500;color:var(--text);pointer-events:none;}
+
+#wrap{display:flex;flex-direction:column;height:calc(100vh - 40px);}
+#scroll{flex:1;overflow-y:auto;padding:18px 20px;}
+#footer{padding:12px 20px;border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:8px;background:var(--surface);flex-shrink:0;}
+
+.sec{margin-bottom:20px;}
+.sec-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--text2);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.row label{font-size:12px;color:var(--text);min-width:80px;flex-shrink:0;}
+.hint{font-size:11px;color:var(--text2);min-width:36px;text-align:right;}
+
+.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}
+.swatch{height:46px;border-radius:10px;cursor:pointer;border:2.5px solid transparent;
+  transition:all 0.15s;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:13px;gap:2px;}
+.swatch:hover{transform:scale(1.03);}
+.swatch.active{border-color:var(--text);}
+
+.colors{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.cpick{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cpick label{font-size:10px;color:var(--text2);}
+.cpick input[type=color]{width:38px;height:28px;border:1px solid var(--border);
+  border-radius:5px;cursor:pointer;background:none;padding:2px;}
+
+input[type=range]{flex:1;height:4px;accent-color:var(--accent);cursor:pointer;border-radius:2px;}
+select{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;
+  padding:6px 8px;font-size:12px;color:var(--text);outline:none;font-family:var(--font);cursor:pointer;}
+
+.tog{width:34px;height:18px;border-radius:9px;background:var(--border);border:none;
+  cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;
+  background:#fff;border-radius:50%;transition:left 0.2s;}
+.tog.on{background:var(--accent);}
+.tog.on::after{left:19px;}
+.tog-label{font-size:12px;color:var(--text2);}
+
+.mod-row{display:flex;align-items:center;justify-content:space-between;
+  padding:7px 0;border-bottom:1px solid var(--border);}
+.mod-row:last-child{border-bottom:none;}
+.mod-name{font-size:12px;color:var(--text);}
+
+.btn{padding:7px 20px;border-radius:8px;border:1.5px solid var(--border);
+  font-size:12px;cursor:pointer;font-family:var(--font);transition:all 0.15s;
+  color:var(--text);background:none;}
+.btn:hover{background:var(--border);}
+.btn-ok{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-ok:hover{opacity:0.88;background:var(--accent);}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="tb">
+  <button class="tl tl-c" id="btn-cancel-tl"></button>
+  <button class="tl tl-d"></button>
+  <button class="tl tl-d"></button>
+  <div class="tb-title" id="tb-title">DayCal 偏好设置</div>
+</div>
+<div id="wrap">
+<div id="scroll">
+
+  <!-- 外观 -->
+  <div class="sec">
+    <div class="sec-title" id="s-appearance">外观主题</div>
+    <div class="swatches">
+      <div class="swatch" data-theme="light" style="background:#fff8fa;border-color:#ffccd8" data-tid="theme_light">
+        ☀️<span id="lbl-light" style="color:#ff8fab">浅色</span>
+      </div>
+      <div class="swatch" data-theme="dark" style="background:#16161e;border-color:#2e2e48" data-tid="theme_dark">
+        🌙<span id="lbl-dark" style="color:#aaa8cc">深色</span>
+      </div>
+      <div class="swatch" data-theme="auto" style="background:linear-gradient(135deg,#fff8fa 50%,#16161e 50%)" data-tid="theme_auto">
+        ◑<span id="lbl-auto" style="color:#888">跟随系统</span>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div class="colors">
+        <div class="cpick">
+          <input type="color" id="cp-a1" value="#FF8FAB">
+          <label id="lbl-accent">主题颜色</label>
+        </div>
+        <div class="cpick">
+          <input type="color" id="cp-a2" value="#FFB347">
+          <label id="lbl-border">边框色</label>
+        </div>
+        <div class="cpick">
+          <input type="color" id="cp-tc" value="#1a1a2e">
+          <label id="lbl-textcol">文字颜色</label>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <label id="lbl-opacity">透明度</label>
+      <input type="range" id="sl-opacity" min="30" max="100" value="86">
+      <span class="hint" id="h-opacity">86%</span>
+    </div>
+  </div>
+
+  <!-- 时钟 -->
+  <div class="sec">
+    <div class="sec-title" id="s-clock">时钟模块</div>
+    <div class="row">
+      <label id="lbl-clocksize">时钟字号</label>
+      <input type="range" id="sl-clock" min="20" max="80" value="38">
+      <span class="hint" id="h-clock">38px</span>
+    </div>
+  </div>
+
+  <!-- 字体 -->
+  <div class="sec">
+    <div class="sec-title" id="s-font">字体</div>
+    <div class="row">
+      <label id="lbl-fontface">界面字体</label>
+      <select id="sel-font">
+        <option value="Microsoft YaHei">微软雅黑</option>
+        <option value="SimSun">宋体</option>
+        <option value="KaiTi">楷体</option>
+        <option value="SimHei">黑体</option>
+        <option value="PingFang SC">苹方 SC</option>
+        <option value="Segoe UI">Segoe UI</option>
+      </select>
+    </div>
+    <div class="row">
+      <label id="lbl-fontsize">字号</label>
+      <input type="range" id="sl-fs" min="10" max="16" value="13">
+      <span class="hint" id="h-fs">13px</span>
+    </div>
+  </div>
+
+  <!-- 模块 -->
+  <div class="sec">
+    <div class="sec-title" id="s-modules">模块显示</div>
+    <div id="mod-list">
+      <div class="mod-row"><span class="mod-name" id="mname-clock">🕐 时钟</span>    <button class="tog on" data-mod="clock"></button></div>
+      <div class="mod-row"><span class="mod-name" id="mname-calendar">📅 日历</span>    <button class="tog on" data-mod="calendar"></button></div>
+      <div class="mod-row"><span class="mod-name" id="mname-todo">✅ 待办事项</span><button class="tog on" data-mod="todo"></button></div>
+      <div class="mod-row"><span class="mod-name" id="mname-memo">📝 备忘录</span>  <button class="tog on" data-mod="memo"></button></div>
+      <div class="mod-row"><span class="mod-name" id="mname-alarm">⏰ 闹铃</span>    <button class="tog on" data-mod="alarm"></button></div>
+      <div class="mod-row"><span class="mod-name" id="mname-ai">✨ AI 助手</span>  <button class="tog on" data-mod="ai"></button></div>
+    </div>
+  </div>
+
+  <!-- 通用 -->
+  <div class="sec">
+    <div class="sec-title" id="s-general">通用</div>
+    <div class="row">
+      <label id="lbl-autolaunch">开机自启</label>
+      <button class="tog" id="tog-auto"></button>
+      <span class="tog-label" id="lbl-autolaunch-desc">开机后自动启动 DayCal</span>
+    </div>
+    <div class="row">
+      <label id="lbl-alwaysontop">始终置顶</label>
+      <button class="tog on" id="tog-top"></button>
+      <span class="tog-label" id="lbl-alwaysontop-desc">所有模块保持在最上层</span>
+    </div>
+  </div>
+
+  <!-- 语言 -->
+  <div class="sec">
+    <div class="sec-title">语言 / Language</div>
+    <div class="row">
+      <label id="lbl-lang">界面语言</label>
+      <select id="sel-lang">
+        <option value="zh">中文 (简体)</option>
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+        <option value="ko">한국어</option>
+        <option value="fr">Français</option>
+        <option value="es">Español</option>
+        <option value="it">Italiano</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 关于 -->
+  <div class="sec">
+    <div class="sec-title" id="s-about">关于</div>
+    <div style="font-size:12px;color:var(--text2);line-height:2">
+      <div>DayCal &nbsp;v1.0.0</div>
+      <div id="about-publisher">发布者：Velvetworm</div>
+      <div id="about-desc">数据保存在本地，不联网，不上传任何内容</div>
+    </div>
+  </div>
+
+</div><!-- /scroll -->
+<div id="footer">
+  <button class="btn" id="btn-cancel">取消</button>
+  <button class="btn btn-ok" id="btn-apply">确定并应用</button>
+</div>
+</div><!-- /wrap -->
+
+<script>
+'use strict';
+
+/* ══ i18n for settings window ══ */
+const S_LANGS = {
+  zh:{
+    title:'DayCal 偏好设置',
+    s_appearance:'外观主题',s_clock:'时钟模块',s_font:'字体',s_modules:'模块显示',s_general:'通用',s_about:'关于',
+    theme_light:'浅色',theme_dark:'深色',theme_auto:'跟随系统',
+    lbl_accent:'主题颜色',lbl_border:'边框色',lbl_textcol:'文字颜色',lbl_opacity:'透明度',
+    lbl_clocksize:'时钟字号',lbl_fontface:'界面字体',lbl_fontsize:'字号',
+    lbl_lang:'界面语言',
+    lbl_autolaunch:'开机自启',lbl_autolaunch_desc:'开机后自动启动 DayCal',
+    lbl_alwaysontop:'始终置顶',lbl_alwaysontop_desc:'所有模块保持在最上层',
+    s_modules_list:['🕐 时钟','📅 日历','✅ 待办事项','📝 备忘录','⏰ 闹铃','✨ AI'],
+    about_publisher:'发布者：Velvetworm',about_desc:'数据保存在本地，不联网，不上传任何内容',
+    btn_cancel:'取消',btn_apply:'确定并应用',
+  },
+  en:{
+    title:'DayCal Preferences',
+    s_appearance:'Appearance',s_clock:'Clock',s_font:'Font',s_modules:'Modules',s_general:'General',s_about:'About',
+    theme_light:'Light',theme_dark:'Dark',theme_auto:'Auto',
+    lbl_accent:'Theme Color',lbl_border:'Border Color',lbl_textcol:'Text Color',lbl_opacity:'Opacity',
+    lbl_clocksize:'Clock Size',lbl_fontface:'Font',lbl_fontsize:'Font Size',
+    lbl_lang:'Language',
+    lbl_autolaunch:'Auto-Launch',lbl_autolaunch_desc:'Launch DayCal at startup',
+    lbl_alwaysontop:'Always on Top',lbl_alwaysontop_desc:'Keep all modules above other windows',
+    s_modules_list:['🕐 Clock','📅 Calendar','✅ To-Do','📝 Memo','⏰ Alarm','✨ AI'],
+    about_publisher:'Publisher: Velvetworm',about_desc:'All data stored locally. No network access.',
+    btn_cancel:'Cancel',btn_apply:'Apply',
+  },
+  ja:{
+    title:'DayCal 環境設定',
+    s_appearance:'外観',s_clock:'時計',s_font:'フォント',s_modules:'モジュール',s_general:'一般',s_about:'情報',
+    theme_light:'ライト',theme_dark:'ダーク',theme_auto:'自動',
+    lbl_accent:'テーマカラー',lbl_border:'ボーダー色',lbl_textcol:'テキスト色',lbl_opacity:'透明度',
+    lbl_clocksize:'時計サイズ',lbl_fontface:'フォント',lbl_fontsize:'フォントサイズ',
+    lbl_lang:'言語',
+    lbl_autolaunch:'自動起動',lbl_autolaunch_desc:'起動時にDayCalを自動で開く',
+    lbl_alwaysontop:'常に最前面',lbl_alwaysontop_desc:'すべてのモジュールを最前面に保つ',
+    s_modules_list:['🕐 時計','📅 カレンダー','✅ やること','📝 メモ','⏰ アラーム','✨ AI'],
+    about_publisher:'パブリッシャー：Velvetworm',about_desc:'データはローカルに保存。ネットワーク不使用。',
+    btn_cancel:'キャンセル',btn_apply:'適用',
+  },
+  ko:{
+    title:'DayCal 환경설정',
+    s_appearance:'외관',s_clock:'시계',s_font:'글꼴',s_modules:'모듈',s_general:'일반',s_about:'정보',
+    theme_light:'라이트',theme_dark:'다크',theme_auto:'자동',
+    lbl_accent:'테마 색상',lbl_border:'테두리 색',lbl_textcol:'텍스트 색',lbl_opacity:'투명도',
+    lbl_clocksize:'시계 크기',lbl_fontface:'글꼴',lbl_fontsize:'글꼴 크기',
+    lbl_lang:'언어',
+    lbl_autolaunch:'자동 실행',lbl_autolaunch_desc:'시작 시 DayCal 자동 실행',
+    lbl_alwaysontop:'항상 위',lbl_alwaysontop_desc:'모든 모듈을 다른 창 위에 유지',
+    s_modules_list:['🕐 시계','📅 달력','✅ 할 일','📝 메모','⏰ 알람','✨ AI'],
+    about_publisher:'게시자: Velvetworm',about_desc:'모든 데이터는 로컬 저장. 네트워크 미사용.',
+    btn_cancel:'취소',btn_apply:'적용',
+  },
+  fr:{
+    title:'Préférences DayCal',
+    s_appearance:'Apparence',s_clock:'Horloge',s_font:'Police',s_modules:'Modules',s_general:'Général',s_about:'À propos',
+    theme_light:'Clair',theme_dark:'Sombre',theme_auto:'Auto',
+    lbl_accent:'Couleur principale',lbl_border:'Couleur bordure',lbl_textcol:'Couleur texte',lbl_opacity:'Opacité',
+    lbl_clocksize:'Taille horloge',lbl_fontface:'Police',lbl_fontsize:'Taille police',
+    lbl_lang:'Langue',
+    lbl_autolaunch:'Démarrage auto',lbl_autolaunch_desc:'Lancer DayCal au démarrage',
+    lbl_alwaysontop:'Toujours visible',lbl_alwaysontop_desc:'Garder les modules au premier plan',
+    s_modules_list:['🕐 Horloge','📅 Calendrier','✅ Tâches','📝 Mémo','⏰ Alarme','✨ AI'],
+    about_publisher:'Éditeur : Velvetworm',about_desc:'Données stockées localement. Aucun accès réseau.',
+    btn_cancel:'Annuler',btn_apply:'Appliquer',
+  },
+  es:{
+    title:'Preferencias DayCal',
+    s_appearance:'Apariencia',s_clock:'Reloj',s_font:'Fuente',s_modules:'Módulos',s_general:'General',s_about:'Acerca de',
+    theme_light:'Claro',theme_dark:'Oscuro',theme_auto:'Auto',
+    lbl_accent:'Color principal',lbl_border:'Color borde',lbl_textcol:'Color texto',lbl_opacity:'Opacidad',
+    lbl_clocksize:'Tamaño reloj',lbl_fontface:'Fuente',lbl_fontsize:'Tamaño fuente',
+    lbl_lang:'Idioma',
+    lbl_autolaunch:'Inicio auto',lbl_autolaunch_desc:'Iniciar DayCal al arrancar',
+    lbl_alwaysontop:'Siempre visible',lbl_alwaysontop_desc:'Mantener módulos en primer plano',
+    s_modules_list:['🕐 Reloj','📅 Calendario','✅ Tareas','📝 Memo','⏰ Alarma','✨ AI'],
+    about_publisher:'Editor: Velvetworm',about_desc:'Datos guardados localmente. Sin acceso a red.',
+    btn_cancel:'Cancelar',btn_apply:'Aplicar',
+  },
+  it:{
+    title:'Preferenze DayCal',
+    s_appearance:'Aspetto',s_clock:'Orologio',s_font:'Carattere',s_modules:'Moduli',s_general:'Generale',s_about:'Informazioni',
+    theme_light:'Chiaro',theme_dark:'Scuro',theme_auto:'Auto',
+    lbl_accent:'Colore principale',lbl_border:'Colore bordo',lbl_textcol:'Colore testo',lbl_opacity:'Opacità',
+    lbl_clocksize:'Dimensione orologio',lbl_fontface:'Carattere',lbl_fontsize:'Dimensione',
+    lbl_lang:'Lingua',
+    lbl_autolaunch:'Avvio automatico',lbl_autolaunch_desc:'Avvia DayCal all\'avvio del sistema',
+    lbl_alwaysontop:'Sempre in primo piano',lbl_alwaysontop_desc:'Mantieni i moduli sopra le altre finestre',
+    s_modules_list:['🕐 Orologio','📅 Calendario','✅ Attività','📝 Memo','⏰ Sveglia','✨ AI'],
+    about_publisher:'Editore: Velvetworm',about_desc:'Dati salvati in locale. Nessun accesso di rete.',
+    btn_cancel:'Annulla',btn_apply:'Applica',
+  },
+};
+
+function applySettingsLang(lang){
+  const L = S_LANGS[lang] || S_LANGS.zh;
+  const MOD_IDS = ['clock','calendar','todo','memo','alarm'];
+  setText('tb-title', L.title);
+  setText('s-appearance', L.s_appearance);
+  setText('s-clock', L.s_clock);
+  setText('s-font', L.s_font);
+  setText('s-modules', L.s_modules);
+  setText('s-general', L.s_general);
+  setText('s-about', L.s_about);
+  setText('lbl-light', L.theme_light);
+  setText('lbl-dark', L.theme_dark);
+  setText('lbl-auto', L.theme_auto);
+  setText('lbl-accent', L.lbl_accent);
+  setText('lbl-border', L.lbl_border);
+  setText('lbl-textcol', L.lbl_textcol);
+  setText('lbl-opacity', L.lbl_opacity);
+  setText('lbl-clocksize', L.lbl_clocksize);
+  setText('lbl-fontface', L.lbl_fontface);
+  setText('lbl-fontsize', L.lbl_fontsize);
+  setText('lbl-lang', L.lbl_lang);
+  setText('lbl-autolaunch', L.lbl_autolaunch);
+  setText('lbl-autolaunch-desc', L.lbl_autolaunch_desc);
+  setText('lbl-alwaysontop', L.lbl_alwaysontop);
+  setText('lbl-alwaysontop-desc', L.lbl_alwaysontop_desc);
+  setText('about-publisher', L.about_publisher);
+  setText('about-desc', L.about_desc);
+  setText('btn-cancel', L.btn_cancel);
+  setText('btn-apply', L.btn_apply);
+  const MOD_IDS_AI = ['clock','calendar','todo','memo','alarm','ai'];
+  L.s_modules_list.forEach((name, i) => setText('mname-'+MOD_IDS_AI[i], name));
+}
+function setText(id, val){ const el=document.getElementById(id); if(el) el.textContent=val; }
+
+/* ══ State ══ */
+let CFG = {};
+let currentTheme = 'light';
+
+async function init(){
+  try{ CFG = await window.api?.getConfig() || {}; } catch{}
+
+  currentTheme = CFG.theme || 'light';
+  markTheme(currentTheme);
+  document.documentElement.classList.toggle('dark', currentTheme==='dark');
+
+  if(CFG.accent)    document.getElementById('cp-a1').value = CFG.accent;
+  if(CFG.accent2)   document.getElementById('cp-a2').value = CFG.accent2;
+  if(CFG.textColor) document.getElementById('cp-tc').value = CFG.textColor;
+
+  const op = CFG.opacity ?? 86;
+  document.getElementById('sl-opacity').value = op;
+  document.getElementById('h-opacity').textContent = op + '%';
+
+  const cs = CFG.clockSize ?? 38;
+  document.getElementById('sl-clock').value = cs;
+  document.getElementById('h-clock').textContent = cs + 'px';
+
+  const fs = CFG.fontSize ?? 13;
+  document.getElementById('sl-fs').value = fs;
+  document.getElementById('h-fs').textContent = fs + 'px';
+
+  if(CFG.font) document.getElementById('sel-font').value = CFG.font;
+
+  const lang = CFG.lang || 'zh';
+  document.getElementById('sel-lang').value = lang;
+  applySettingsLang(lang);
+
+  const mods = CFG.modules || {};
+  document.querySelectorAll('[data-mod]').forEach(btn => {
+    if(mods[btn.dataset.mod] === false) btn.classList.remove('on');
+  });
+  if(CFG.autoLaunch) document.getElementById('tog-auto').classList.add('on');
+  if(CFG.alwaysOnTop===false) document.getElementById('tog-top').classList.remove('on');
+}
+
+/* ══ Theme swatches ══ */
+document.querySelectorAll('.swatch').forEach(s => {
+  s.addEventListener('click', () => {
+    currentTheme = s.dataset.theme;
+    markTheme(currentTheme);
+    document.documentElement.classList.toggle('dark', currentTheme==='dark');
+  });
+});
+function markTheme(t){
+  document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('active', s.dataset.theme===t));
+}
+
+/* ══ Language selector — live update settings UI ══ */
+document.getElementById('sel-lang').addEventListener('change', function(){
+  applySettingsLang(this.value);
+});
+
+/* ══ Slider hints ══ */
+document.getElementById('sl-opacity').addEventListener('input', function(){ document.getElementById('h-opacity').textContent = this.value+'%'; });
+document.getElementById('sl-clock').addEventListener('input',   function(){ document.getElementById('h-clock').textContent   = this.value+'px'; });
+document.getElementById('sl-fs').addEventListener('input',      function(){ document.getElementById('h-fs').textContent      = this.value+'px'; });
+
+/* ══ Toggles ══ */
+document.querySelectorAll('.tog').forEach(btn => btn.addEventListener('click', () => btn.classList.toggle('on')));
+
+/* ══ Build + Apply ══ */
+function buildSettings(){
+  const mods = {};
+  document.querySelectorAll('[data-mod]').forEach(btn => { mods[btn.dataset.mod] = btn.classList.contains('on'); });
+  return {
+    theme:       currentTheme,
+    accent:      document.getElementById('cp-a1').value,
+    accent2:     document.getElementById('cp-a2').value,
+    textColor:   document.getElementById('cp-tc').value,
+    opacity:     parseInt(document.getElementById('sl-opacity').value),
+    clockSize:   parseInt(document.getElementById('sl-clock').value),
+    font:        document.getElementById('sel-font').value,
+    fontSize:    parseInt(document.getElementById('sl-fs').value),
+    lang:        document.getElementById('sel-lang').value,
+    autoLaunch:  document.getElementById('tog-auto').classList.contains('on'),
+    alwaysOnTop: document.getElementById('tog-top').classList.contains('on'),
+    modules:     mods,
+  };
+}
+
+document.getElementById('btn-apply').addEventListener('click', () => {
+  const s = buildSettings();
+  window.api?.setConfig(s);
+  window.api?.applySettings(s);
+  window.api?.closeSettings();
+});
+document.getElementById('btn-cancel').addEventListener('click', () => window.api?.closeSettings());
+document.getElementById('btn-cancel-tl').addEventListener('click', () => window.api?.closeSettings());
+
+init();
+</script>
+</body>
+</html>

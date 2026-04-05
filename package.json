@@ -1,0 +1,43 @@
+{
+  "name": "daycal",
+  "version": "1.0.0",
+  "description": "DayCal - 桌面悬浮日历",
+  "author": "Velvetworm",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build-nsis": "electron-builder --win nsis --x64",
+    "build-portable": "electron-builder --win portable --x64"
+  },
+  "build": {
+    "appId": "com.daycal.app",
+    "productName": "DayCal",
+    "copyright": "© 2025 DayCal",
+    "publish": null,
+    "directories": { "output": "dist" },
+    "files": ["main.js","preload.js","src/**/*","assets/**/*"],
+    "win": {
+      "icon": "assets/icon.ico",
+      "publisherName": "Velvetworm",
+      "target": [
+        { "target": "nsis",     "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DayCal",
+      "runAfterFinish": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

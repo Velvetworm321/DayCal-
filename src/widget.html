@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --accent:#FF8FAB;--accent2:#FFB347;--green:#6EE7A0;
+  --text:#1a1a2e;--text2:#8888aa;--text-color:#1a1a2e;
+  --card-bg:rgba(255,255,255,0.86);--surface:rgba(248,246,243,0.90);
+  --border:rgba(0,0,0,0.09);--border-hover:rgba(0,0,0,0.18);
+  --shadow:0 4px 24px rgba(0,0,0,0.10);--radius:14px;--clock-size:38px;
+}
+html,body{width:100%;height:100%;background:transparent;overflow:hidden;
+  -webkit-user-select:none;user-select:none;
+  font-family:'Microsoft YaHei','PingFang SC','Segoe UI',sans-serif;font-size:13px;}
+
+/* ── Widget shell ── */
+#widget{width:100vw;height:100vh;background:var(--card-bg);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-radius:var(--radius);border:1px solid transparent;box-shadow:none;
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:border-color 0.2s,box-shadow 0.2s,background 0.3s;}
+#widget:hover:not(.frozen){border-color:var(--border-hover);box-shadow:var(--shadow);}
+
+/* ── Drag bar – appears on hover ── */
+#drag-bar{height:28px;background:transparent;border-bottom:1px solid transparent;
+  display:flex;align-items:center;padding:0 8px;gap:6px;
+  -webkit-app-region:drag;flex-shrink:0;
+  border-radius:var(--radius) var(--radius) 0 0;
+  transition:background 0.2s,border-color 0.2s,opacity 0.2s;
+  opacity:0;pointer-events:none;}
+#widget:hover:not(.frozen) #drag-bar{opacity:1;pointer-events:all;
+  background:var(--surface);border-bottom-color:var(--border);}
+/* Frozen: keep drag bar invisible but buttons clickable */
+#widget.frozen #drag-bar{opacity:0;pointer-events:all;}
+#widget.frozen:hover #drag-bar{opacity:1;pointer-events:all;
+  background:var(--surface);border-bottom-color:var(--border);}
+#widget.frozen #body{pointer-events:none;}
+
+button,input,textarea,a{-webkit-app-region:no-drag;}
+.dot-btn{width:11px;height:11px;border-radius:50%;border:none;cursor:pointer;
+  flex-shrink:0;transition:filter 0.15s;-webkit-app-region:no-drag;}
+.dot-btn:hover{filter:brightness(0.82);}
+.dot-close{background:#ff5f57;}
+.dot-pin{background:#28c840;}.dot-pin.off{background:#bbb;}
+/* Lock button */
+.dot-lock{background:var(--accent);transition:background 0.15s;}
+.dot-lock.unlocked{background:#bbb;}
+
+.drag-title{flex:1;text-align:center;font-size:10px;color:var(--text2);
+  letter-spacing:2px;pointer-events:none;-webkit-app-region:drag;}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--text2);
+  font-size:12px;padding:2px 4px;border-radius:4px;
+  transition:color 0.12s,background 0.12s;-webkit-app-region:no-drag;line-height:1;}
+.icon-btn:hover{color:var(--accent);background:rgba(0,0,0,0.05);}
+
+#body{flex:1;padding:10px 12px 10px;overflow:hidden;display:flex;flex-direction:column;gap:6px;
+  transition:pointer-events 0.1s,opacity 0.2s;}
+#resize-h{position:fixed;bottom:0;right:0;width:18px;height:18px;
+  cursor:se-resize;-webkit-app-region:no-drag;opacity:0;transition:opacity 0.2s;}
+#widget:hover:not(.frozen) #resize-h{opacity:1;}
+#resize-h::before{content:'';position:absolute;bottom:3px;right:3px;width:8px;height:8px;
+  border-right:2px solid var(--text2);border-bottom:2px solid var(--text2);
+  border-radius:0 0 2px 0;opacity:0.5;}
+
+
+
+/* ── Clock ── */
+.clock-time{font-size:var(--clock-size);font-weight:300;color:var(--text-color);
+  letter-spacing:-1px;line-height:1;transition:font-size 0.2s;}
+.clock-sub{display:flex;gap:8px;margin-top:4px;font-size:11px;color:var(--text2);}
+.clock-week{color:var(--accent);font-weight:500;}
+
+/* ── Calendar ── */
+.cal-nav{display:flex;align-items:center;gap:4px;margin-bottom:6px;}
+.cal-nav-lbl{flex:1;text-align:center;font-size:14px;font-weight:700;color:var(--text-color);}
+.nav-btn{width:20px;height:20px;border-radius:5px;border:none;
+  background:rgba(0,0,0,0.05);color:var(--text2);font-size:13px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.1s;}
+.nav-btn:hover{background:var(--accent);color:#fff;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;}
+.cal-wd{text-align:center;font-size:9px;color:var(--text2);padding-bottom:2px;}
+.cal-d{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:10px;border-radius:4px;cursor:pointer;color:var(--text-color);
+  position:relative;transition:background 0.1s;}
+.cal-d:hover{background:rgba(255,143,171,0.15);}
+.cal-d.other{color:rgba(0,0,0,0.18);}
+.cal-d.today{background:var(--accent);color:#fff;font-weight:600;}
+.cal-d.selected:not(.today){background:rgba(255,143,171,0.22);outline:1.5px solid var(--accent);}
+.cal-d.has-dot::after{content:'';position:absolute;bottom:1px;
+  width:3px;height:3px;border-radius:50%;background:var(--accent);}
+.cal-d.today.has-dot::after{background:rgba(255,255,255,0.85);}
+
+/* ── Day popup ── */
+#day-popup{position:fixed;inset:0;background:rgba(0,0,0,0.25);
+  display:none;align-items:center;justify-content:center;
+  z-index:1000;-webkit-app-region:no-drag;backdrop-filter:blur(4px);}
+#day-popup.open{display:flex;}
+.popup-card{background:var(--card-bg);backdrop-filter:blur(24px);
+  border:1px solid var(--border-hover);border-radius:14px;
+  padding:16px 18px;width:280px;max-height:80vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.18);}
+.popup-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.popup-date{font-size:14px;font-weight:600;color:var(--text-color);}
+.popup-close{background:none;border:none;cursor:pointer;color:var(--text2);font-size:17px;line-height:1;padding:2px;}
+.popup-sec{margin-bottom:14px;}
+.popup-sec-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);margin-bottom:6px;}
+
+/* ── Todo ── */
+.todo-list{flex:1;overflow-y:auto;margin-bottom:6px;}
+.todo-item{display:flex;align-items:flex-start;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);}
+.todo-item:last-child{border-bottom:none;}
+.chk{width:13px;height:13px;border-radius:3px;border:1.5px solid var(--text2);
+  cursor:pointer;flex-shrink:0;margin-top:2px;
+  display:flex;align-items:center;justify-content:center;font-size:8px;transition:all 0.12s;}
+.chk.done{background:var(--green);border-color:var(--green);color:#fff;}
+.todo-txt{flex:1;font-size:12px;color:var(--text-color);line-height:1.4;}
+.todo-txt.done{text-decoration:line-through;color:var(--text2);}
+.del-btn{background:none;border:none;color:var(--text2);cursor:pointer;
+  font-size:13px;opacity:0;transition:opacity 0.1s;padding:0 2px;flex-shrink:0;}
+.todo-item:hover .del-btn,.alarm-item:hover .del-btn{opacity:1;}
+
+/* ── Inputs ── */
+.add-row{display:flex;gap:5px;flex-shrink:0;}
+.inp{flex:1;background:var(--surface);border:1px solid var(--accent2);border-radius:7px;
+  padding:5px 8px;font-size:12px;color:var(--text-color);outline:none;transition:border 0.12s;
+  font-family:inherit;-webkit-user-select:text;user-select:text;}
+.inp:focus{border-color:var(--accent);}
+.inp::placeholder{color:var(--text2);}
+.inp-time{flex:none;width:80px;color-scheme:light;}
+.inp-date{flex:none;width:116px;color-scheme:light;}
+.add-btn{background:var(--accent);border:none;color:#fff;border-radius:7px;width:26px;
+  font-size:17px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;transition:opacity 0.12s;}
+.add-btn:hover{opacity:0.82;}
+.tone-sel{flex:none;background:var(--surface);border:1px solid var(--accent2);
+  border-radius:7px;padding:4px 5px;font-size:11px;color:var(--text-color);
+  outline:none;font-family:inherit;cursor:pointer;}
+
+/* ── Memo ── */
+.memo-ta{flex:1;width:100%;background:var(--surface);border:1px solid var(--accent2);
+  border-radius:7px;padding:7px 8px;font-size:12px;color:var(--text-color);resize:none;outline:none;
+  line-height:1.7;font-family:inherit;min-height:60px;
+  -webkit-user-select:text;user-select:text;transition:border 0.12s;}
+.memo-ta:focus{border-color:var(--accent);}
+.memo-ta::placeholder{color:var(--text2);}
+.memo-foot{display:flex;justify-content:flex-end;flex-shrink:0;margin-top:5px;}
+.save-btn{background:var(--accent);border:none;color:#fff;
+  border-radius:6px;padding:4px 14px;font-size:11px;cursor:pointer;
+  font-family:inherit;transition:opacity 0.12s;}
+.save-btn:hover{opacity:0.82;}
+
+/* ── Alarm ── */
+.alarm-list{flex:1;overflow-y:auto;margin-bottom:6px;}
+.alarm-item{display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);}
+.alarm-item:last-child{border-bottom:none;}
+.alarm-time{font-size:13px;color:var(--accent);font-weight:500;min-width:44px;}
+.alarm-lbl{flex:1;font-size:11px;color:var(--text-color);}
+.alarm-date{font-size:10px;color:var(--text2);min-width:52px;text-align:right;}
+.alarm-tone{font-size:10px;color:var(--text2);}
+.sw{width:28px;height:15px;border-radius:8px;background:var(--border);border:none;
+  cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;
+  background:#fff;border-radius:50%;transition:left 0.2s;}
+.sw.on{background:var(--accent);}
+.sw.on::after{left:15px;}
+
+/* ── Toast ── */
+#toasts{position:fixed;bottom:8px;right:8px;z-index:9999;
+  display:flex;flex-direction:column-reverse;gap:5px;pointer-events:none;}
+.toast{background:var(--card-bg);border:1px solid var(--border-hover);
+  border-left:3px solid var(--accent);border-radius:8px;
+  padding:8px 10px;display:flex;gap:7px;align-items:flex-start;
+  min-width:170px;max-width:230px;pointer-events:all;animation:tIn 0.2s ease;}
+.toast.alarm-t{border-left-color:var(--accent);}
+.t-ttl{font-size:9px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:1px;}
+.t-bdy{font-size:11px;color:var(--text-color);}
+.t-x{background:none;border:none;color:var(--text2);cursor:pointer;font-size:12px;margin-left:auto;flex-shrink:0;}
+@keyframes tIn{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@keyframes tOut{to{opacity:0;transform:translateY(8px)}}
+.empty{text-align:center;font-size:11px;color:var(--text2);padding:8px 0;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="widget">
+  <div id="drag-bar">
+    <button class="dot-btn dot-close" id="btn-close"></button>
+    <button class="dot-btn dot-pin"   id="btn-pin"></button>
+    <button class="dot-btn dot-lock unlocked" id="btn-lock"></button>
+    <span class="drag-title" id="mod-title"></span>
+    <div style="display:flex;align-items:center;gap:4px;-webkit-app-region:no-drag">
+      <button class="icon-btn" id="btn-settings">⚙</button>
+    </div>
+  </div>
+  <div id="body"></div>
+  <div id="resize-h"></div>
+</div>
+<div id="day-popup">
+  <div class="popup-card">
+    <div class="popup-head">
+      <span class="popup-date" id="popup-date-lbl"></span>
+      <button class="popup-close" id="popup-close-btn">×</button>
+    </div>
+    <div id="popup-content"></div>
+  </div>
+</div>
+<div id="toasts"></div>
+
+<script>
+'use strict';
+
+/* ══ Shared data (IPC, single source of truth) ══ */
+let D={todos:{},memos:{},alarms:[]};
+async function loadD(){try{const s=await window.api?.getData();if(s)D=s;}catch(e){}}
+async function saveD(){try{await window.api?.setData(D);}catch(e){}}
+window.api?.onDataChanged(nd=>{
+  D=nd;
+  if(MOD==='calendar')renderCal();
+  if(MOD==='todo')renderTodos();
+  if(MOD==='memo')renderMemo();
+  if(MOD==='alarm')renderAlarms();
+});
+// Alarm fire broadcast — every window receives this and plays audio
+window.api?.onAlarmFire(info=>{
+  playTone(info.tone||'gentle');
+  showToast(T('alarm_fired'),`${info.label}`,'🔔',true);
+});
+// Alarm stop broadcast — every window stops audio
+window.api?.onAlarmStop(()=>{
+  if(currentAlarmStop){ currentAlarmStop(); currentAlarmStop=null; }
+});
+
+/* ══ Config ══ */
+let CFG={theme:'light',accent:'#FF8FAB',accent2:'#FFB347',
+  opacity:86,font:'Microsoft YaHei',fontSize:13,clockSize:38,lang:'zh',textColor:'#1a1a2e'};
+async function loadCFG(){try{const s=await window.api?.getConfig();if(s)CFG=Object.assign(CFG,s);}catch{}applyCFG();}
+
+function hexToRgba(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function applyCFG(){
+  const r=document.documentElement.style,isDark=CFG.theme==='dark';
+  r.setProperty('--accent', CFG.accent||'#FF8FAB');
+  r.setProperty('--accent2',CFG.accent2||'#FFB347');
+  const op=(CFG.opacity||86)/100;
+  const tc=CFG.textColor||(isDark?'#f0eee8':'#1a1a2e');
+  r.setProperty('--text-color',tc);
+  if(isDark){
+    r.setProperty('--card-bg',`rgba(22,22,34,${op})`);r.setProperty('--surface',`rgba(30,30,46,${op})`);
+    r.setProperty('--border','rgba(255,255,255,0.09)');
+    r.setProperty('--border-hover', hexToRgba(CFG.accent2||'#FFB347', 0.55));
+    r.setProperty('--text','#f0eee8');r.setProperty('--text2','#8a8aa8');r.setProperty('--shadow','0 4px 24px rgba(0,0,0,0.35)');
+  }else{
+    r.setProperty('--card-bg',`rgba(255,255,255,${op})`);r.setProperty('--surface',`rgba(248,246,243,${op})`);
+    r.setProperty('--border','rgba(0,0,0,0.09)');
+    // border-hover uses accent2 (the "边框色" the user picked)
+    r.setProperty('--border-hover', hexToRgba(CFG.accent2||'#FFB347', 0.55));
+    r.setProperty('--text','#1a1a2e');r.setProperty('--text2','#8888aa');r.setProperty('--shadow','0 4px 24px rgba(0,0,0,0.10)');
+  }
+  document.body.style.fontFamily=`'${CFG.font||'Microsoft YaHei'}','PingFang SC','Segoe UI',sans-serif`;
+  document.body.style.fontSize=(CFG.fontSize||13)+'px';
+  r.setProperty('--clock-size',(CFG.clockSize||38)+'px');
+  // Re-render dynamic text labels that depend on lang/accent
+  document.getElementById('mod-title').textContent=T('mod_'+MOD);
+  // Update button tooltips with current language
+  updateBtnTitles();
+  // Re-render module content to pick up new translations
+  reRenderModule();
+}
+
+/* ══ i18n — full coverage of all visible strings ══ */
+const LANGS={
+  zh:{
+    alarm_repeat:'每日重复',
+    sch_time:'设置时间',sch_placeholder:'添加日程…',sch_empty:'暂无日程',sch_added:'日程已添加',sch_synced:'已同步到闹铃',
+    close:'关闭',settings:'设置',
+    mod_clock:'时钟',mod_calendar:'日历',mod_todo:'待办事项',mod_memo:'备忘录',mod_alarm:'闹铃',
+    wdays:['日','一','二','三','四','五','六'],
+    fwdays:['星期日','星期一','星期二','星期三','星期四','星期五','星期六'],
+    empty_todo:'暂无待办',empty_alarm:'暂无闹铃',
+    add_todo:'添加任务…',add_memo:'记录今天的想法…',add_alarm_lbl:'提醒内容…',
+    save:'保 存',popup_todo:'待办',popup_memo:'备忘录',popup_alarm:'闹铃',
+    none:'暂无',alarm_fired:'闹铃响了',alarm_set:'闹铃已设置',memo_saved:'备忘录已保存',
+    daily_remind:'今日待办',daily_remain:'还有 {n} 项未完成',
+    pin:'置顶',unpin:'取消置顶',lock:'锁定',unlock:'解锁',frozen:'已锁定',
+    alarm_repeat:'循环',
+    tone_preview:'试听',tone_upload:'上传音乐',
+    tone_custom:'自定义音乐',
+    tone_gentle:'柔和水晶',tone_forest:'晨雾森林',tone_rhythm:'律动节拍',tone_energy:'活力冲刺',
+  },
+  en:{
+    alarm_repeat:'Repeat daily',
+    sch_time:'Set time',sch_placeholder:'Add schedule…',sch_empty:'No schedule',sch_added:'Added',sch_synced:'Synced to alarm',
+    close:'Close',settings:'Settings',
+    mod_clock:'Clock',mod_calendar:'Calendar',mod_todo:'To-Do',mod_memo:'Memo',mod_alarm:'Alarm',
+    wdays:['Su','Mo','Tu','We','Th','Fr','Sa'],
+    fwdays:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    empty_todo:'No tasks',empty_alarm:'No alarms',
+    add_todo:'Add task…',add_memo:'Write something…',add_alarm_lbl:'Label…',
+    save:'Save',popup_todo:'To-Do',popup_memo:'Memo',popup_alarm:'Alarm',
+    none:'None',alarm_fired:'Alarm!',alarm_set:'Alarm set',memo_saved:'Memo saved',
+    daily_remind:'Today',daily_remain:'{n} tasks left',
+    pin:'Pin',unpin:'Unpin',lock:'Lock',unlock:'Unlock',frozen:'Locked',
+    alarm_repeat:'Repeat',
+    tone_preview:'Preview',tone_upload:'Upload music',
+    tone_custom:'Custom Music',
+    tone_gentle:'Gentle Crystal',tone_forest:'Morning Forest',tone_rhythm:'Rhythmic Beat',tone_energy:'Energy Sprint',
+  },
+  ja:{
+    alarm_repeat:'毎日繰り返す',
+    sch_time:'時刻設定',sch_placeholder:'日程を追加…',sch_empty:'日程なし',sch_added:'追加済み',sch_synced:'アラーム同期済み',
+    close:'閉じる',settings:'設定',
+    mod_clock:'時計',mod_calendar:'カレンダー',mod_todo:'やること',mod_memo:'メモ',mod_alarm:'アラーム',
+    wdays:['日','月','火','水','木','金','土'],
+    fwdays:['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'],
+    empty_todo:'タスクなし',empty_alarm:'アラームなし',
+    add_todo:'タスクを追加…',add_memo:'今日の記録…',add_alarm_lbl:'ラベル…',
+    save:'保存',popup_todo:'タスク',popup_memo:'メモ',popup_alarm:'アラーム',
+    none:'なし',alarm_fired:'アラーム！',alarm_set:'設定完了',memo_saved:'保存しました',
+    daily_remind:'今日',daily_remain:'残り{n}件',
+    pin:'固定',unpin:'固定解除',lock:'ロック',unlock:'解除',frozen:'ロック中',
+    alarm_repeat:'繰り返し',
+    tone_preview:'試聴',tone_upload:'音楽アップロード',
+    tone_custom:'カスタム音楽',
+    tone_gentle:'やさしい水晶',tone_forest:'朝霧の森',tone_rhythm:'リズムビート',tone_energy:'エナジー',
+  },
+  ko:{
+    alarm_repeat:'매일 반복',
+    sch_time:'시간 설정',sch_placeholder:'일정 추가…',sch_empty:'일정 없음',sch_added:'추가됨',sch_synced:'알람에 동기화됨',
+    close:'닫기',settings:'설정',
+    mod_clock:'시계',mod_calendar:'달력',mod_todo:'할 일',mod_memo:'메모',mod_alarm:'알람',
+    wdays:['일','월','화','수','목','금','토'],
+    fwdays:['일요일','월요일','화요일','수요일','목요일','금요일','토요일'],
+    empty_todo:'할 일 없음',empty_alarm:'알람 없음',
+    add_todo:'할 일 추가…',add_memo:'오늘 기록…',add_alarm_lbl:'레이블…',
+    save:'저장',popup_todo:'할 일',popup_memo:'메모',popup_alarm:'알람',
+    none:'없음',alarm_fired:'알람!',alarm_set:'알람 설정됨',memo_saved:'저장됨',
+    daily_remind:'오늘',daily_remain:'{n}개 남음',
+    pin:'고정',unpin:'고정 해제',lock:'잠금',unlock:'잠금 해제',frozen:'잠금 중',
+    alarm_repeat:'반복',
+    tone_preview:'미리듣기',tone_upload:'음악 업로드',
+    tone_custom:'커스텀 음악',
+    tone_gentle:'부드러운 크리스탈',tone_forest:'아침 숲',tone_rhythm:'리드미컬',tone_energy:'에너지',
+  },
+  fr:{
+    alarm_repeat:'Répéter',
+    sch_time:'Heure',sch_placeholder:'Ajouter…',sch_empty:'Aucun événement',sch_added:'Ajouté',sch_synced:'Synchronisé',
+    close:'Fermer',settings:'Paramètres',
+    mod_clock:'Horloge',mod_calendar:'Calendrier',mod_todo:'Tâches',mod_memo:'Mémo',mod_alarm:'Alarme',
+    wdays:['Di','Lu','Ma','Me','Je','Ve','Sa'],
+    fwdays:['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'],
+    empty_todo:'Aucune tâche',empty_alarm:'Aucune alarme',
+    add_todo:'Ajouter…',add_memo:"Note d'aujourd'hui…",add_alarm_lbl:'Libellé…',
+    save:'Enreg.',popup_todo:'Tâches',popup_memo:'Mémo',popup_alarm:'Alarme',
+    none:'Aucun',alarm_fired:'Alarme !',alarm_set:'Alarme activée',memo_saved:'Mémo enregistré',
+    daily_remind:"Aujourd'hui",daily_remain:'{n} restantes',
+    pin:'Épingler',unpin:'Désépingler',lock:'Verrouiller',unlock:'Déverrouiller',frozen:'Verrouillé',
+    alarm_repeat:'Répéter',
+    tone_preview:'Écouter',tone_upload:'Charger musique',
+    tone_custom:'Musique perso.',
+    tone_gentle:'Cristal Doux',tone_forest:'Forêt Matinale',tone_rhythm:'Rythme',tone_energy:'Énergie',
+  },
+  es:{
+    alarm_repeat:'Repetir',
+    sch_time:'Hora',sch_placeholder:'Agregar…',sch_empty:'Sin eventos',sch_added:'Agregado',sch_synced:'Sincronizado',
+    close:'Cerrar',settings:'Ajustes',
+    mod_clock:'Reloj',mod_calendar:'Calendario',mod_todo:'Tareas',mod_memo:'Memo',mod_alarm:'Alarma',
+    wdays:['Do','Lu','Ma','Mi','Ju','Vi','Sa'],
+    fwdays:['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'],
+    empty_todo:'Sin tareas',empty_alarm:'Sin alarmas',
+    add_todo:'Agregar…',add_memo:'Nota de hoy…',add_alarm_lbl:'Etiqueta…',
+    save:'Guardar',popup_todo:'Tareas',popup_memo:'Memo',popup_alarm:'Alarma',
+    none:'Ninguno',alarm_fired:'¡Alarma!',alarm_set:'Alarma activada',memo_saved:'Memo guardado',
+    daily_remind:'Hoy',daily_remain:'{n} pendientes',
+    pin:'Fijar',unpin:'Desfijar',lock:'Bloquear',unlock:'Desbloquear',frozen:'Bloqueado',
+    alarm_repeat:'Repetir',
+    tone_preview:'Previsualizar',tone_upload:'Subir música',
+    tone_custom:'Música propia',
+    tone_gentle:'Cristal Suave',tone_forest:'Bosque Mañanero',tone_rhythm:'Ritmo',tone_energy:'Energía',
+  },
+  it:{
+    alarm_repeat:'Ripeti',
+    sch_time:'Ora',sch_placeholder:'Aggiungi…',sch_empty:'Nessun evento',sch_added:'Aggiunto',sch_synced:'Sincronizzato',
+    close:'Chiudi',settings:'Impostazioni',
+    mod_clock:'Orologio',mod_calendar:'Calendario',mod_todo:'Attività',mod_memo:'Memo',mod_alarm:'Sveglia',
+    wdays:['Do','Lu','Ma','Me','Gi','Ve','Sa'],
+    fwdays:['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'],
+    empty_todo:'Nessuna attività',empty_alarm:'Nessuna sveglia',
+    add_todo:'Aggiungi…',add_memo:"Nota di oggi…",add_alarm_lbl:'Etichetta…',
+    save:'Salva',popup_todo:'Attività',popup_memo:'Memo',popup_alarm:'Sveglia',
+    none:'Nessuno',alarm_fired:'Sveglia!',alarm_set:'Sveglia impostata',memo_saved:'Memo salvato',
+    daily_remind:'Oggi',daily_remain:'{n} rimanenti',
+    pin:'Fissa',unpin:'Rimuovi',lock:'Blocca',unlock:'Sblocca',frozen:'Bloccato',
+    alarm_repeat:'Ripeti',
+    tone_preview:'Anteprima',tone_upload:'Carica musica',
+    tone_custom:'Musica custom',
+    tone_gentle:'Cristallo Dolce',tone_forest:'Foresta del Mattino',tone_rhythm:'Ritmo',tone_energy:'Energia',
+  },
+};
+function T(key,vars={}){
+  const map=LANGS[CFG.lang||'zh']||LANGS.zh;
+  let s=map[key]||(LANGS.zh[key]||key);
+  Object.entries(vars).forEach(([k,v])=>s=s.replace('{'+k+'}',v));
+  return s;
+}
+function Tw(i){return(LANGS[CFG.lang||'zh']||LANGS.zh).wdays[i];}
+function Tfw(i){return(LANGS[CFG.lang||'zh']||LANGS.zh).fwdays[i];}
+function toneLabel(name){if(name==='custom')return customAudioName||T('tone_custom');return T('tone_'+name)||name;}
+
+/* ══ Module ══ */
+const MOD=new URLSearchParams(location.search).get('mod')||'clock';
+
+/* ══ Settings broadcast ══ */
+window.api?.onSettingsChanged(s=>{CFG=Object.assign(CFG,s);applyCFG();});
+
+/* ══ Titlebar buttons ══ */
+document.getElementById('btn-close').addEventListener('click',()=>window.api?.winHide(MOD));
+let pinned=true;
+document.getElementById('btn-pin').addEventListener('click',()=>{
+  pinned=!pinned;
+  document.getElementById('btn-pin').classList.toggle('off',!pinned);
+  window.api?.winPin(MOD,pinned);
+  updateBtnTitles();
+});
+// Lock/unlock
+let locked=false;
+function updateBtnTitles(){
+  const closeBtn=document.getElementById('btn-close');
+  const pinBtn=document.getElementById('btn-pin');
+  const lockBtn=document.getElementById('btn-lock');
+  const setBtn=document.getElementById('btn-settings');
+  if(closeBtn) closeBtn.title=T('close');
+  if(pinBtn)   pinBtn.title=pinned?T('unpin'):T('pin');
+  if(lockBtn)  lockBtn.title=locked?T('unlock'):T('lock');
+  if(setBtn)   setBtn.title=T('settings');
+}
+document.getElementById('btn-lock').addEventListener('click',()=>{
+  locked=!locked;
+  const btn=document.getElementById('btn-lock');
+  btn.classList.toggle('unlocked',!locked);
+  document.getElementById('widget').classList.toggle('frozen',locked);
+  updateBtnTitles();
+});
+document.getElementById('btn-settings').addEventListener('click',()=>window.api?.openSettings());
+
+/* ══ Resize ══ */
+let rsing=false,rsX=0,rsY=0,rsW=0,rsH=0;
+document.getElementById('resize-h').addEventListener('mousedown',e=>{
+  if(locked)return;e.preventDefault();rsing=true;rsX=e.screenX;rsY=e.screenY;rsW=window.innerWidth;rsH=window.innerHeight;
+});
+document.addEventListener('mousemove',e=>{if(!rsing)return;window.api?.resizeWin(MOD,Math.max(160,rsW+(e.screenX-rsX)),Math.max(70,rsH+(e.screenY-rsY)));});
+document.addEventListener('mouseup',()=>{rsing=false;});
+
+/* ══ Date utils ══ */
+let vY,vM,selKey;
+function pad(n){return String(n).padStart(2,'0');}
+function toKey(y,m,d){return`${y}-${pad(m+1)}-${pad(d)}`;}
+function todayKey(){const n=new Date();return toKey(n.getFullYear(),n.getMonth(),n.getDate());}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ══ Re-render after lang/theme change ══ */
+function reRenderModule(){
+  if(MOD==='clock')   updateClockLabels();
+  if(MOD==='calendar')renderCal();
+  if(MOD==='todo')    renderTodos();
+  if(MOD==='memo')    {document.querySelector('.memo-ta')&&(document.querySelector('.memo-ta').placeholder=T('add_memo'));}
+  if(MOD==='alarm')   renderAlarms();
+}
+
+/* ══ AUDIO — 4 synthesized tones, each loops for ~60s ══ */
+let audioCtx=null;
+let currentAlarmStop=null; // function to stop current alarm loop
+let previewStop=null;      // preview stop handle
+let customAudioBuffer=null; // user-uploaded audio
+let customAudioName='';
+
+function getCtx(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+document.addEventListener('mousedown',()=>getCtx(),{once:true});
+document.addEventListener('keydown',  ()=>getCtx(),{once:true});
+
+// Each tone builder returns a stop() function
+const TONE_BUILDERS={
+  // 1. 柔和水晶 — repeating bell melody, 60s loop
+  gentle(ctx){
+    const MELODY=[523,659,784,1047,784,659,523,659];
+    const STEP=0.55, LOOP_DUR=MELODY.length*STEP;
+    const masterGain=ctx.createGain(); masterGain.connect(ctx.destination); masterGain.gain.value=1;
+    let stopped=false;
+    function scheduleLoop(startT){
+      if(stopped)return;
+      MELODY.forEach((f,i)=>{
+        const t=startT+i*STEP;
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(masterGain);
+        o.type='sine';o.frequency.value=f;
+        g.gain.setValueAtTime(0,t);
+        g.gain.linearRampToValueAtTime(0.15,t+0.04);
+        g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
+        o.start(t);o.stop(t+0.55);
+      });
+      // Add a gentle harmony note every other loop
+      [0,2,4,6].forEach(i=>{
+        const t=startT+i*STEP;
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(masterGain);
+        o.type='sine';o.frequency.value=MELODY[i]*0.5;
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.07,t+0.1);g.gain.exponentialRampToValueAtTime(0.001,t+STEP*0.9);
+        o.start(t);o.stop(t+STEP);
+      });
+      setTimeout(()=>scheduleLoop(startT+LOOP_DUR),( LOOP_DUR-0.3)*1000);
+    }
+    scheduleLoop(ctx.currentTime);
+    // Fade out after 60s
+    masterGain.gain.setValueAtTime(1,ctx.currentTime+55);
+    masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+60);
+    return ()=>{stopped=true;masterGain.gain.cancelScheduledValues(ctx.currentTime);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.3);};
+  },
+
+  // 2. 晨雾森林 — slow chord pads, ambient, 60s
+  forest(ctx){
+    const CHORDS=[[261,329,392,523],[293,370,440,587],[246,311,370,493],[261,329,392,523]];
+    const STEP=4.0;
+    const masterGain=ctx.createGain();masterGain.connect(ctx.destination);masterGain.gain.value=1;
+    let stopped=false;
+    function scheduleLoop(startT){
+      if(stopped)return;
+      CHORDS.forEach((chord,ci)=>{
+        chord.forEach(f=>{
+          const t=startT+ci*STEP;
+          const o=ctx.createOscillator(),g=ctx.createGain();
+          o.connect(g);g.connect(masterGain);
+          o.type='triangle';o.frequency.value=f;
+          // slight detune for warmth
+          o.detune.value=(Math.random()-0.5)*8;
+          g.gain.setValueAtTime(0,t);
+          g.gain.linearRampToValueAtTime(0.06,t+0.6);
+          g.gain.setValueAtTime(0.06,t+STEP-0.8);
+          g.gain.linearRampToValueAtTime(0,t+STEP);
+          o.start(t);o.stop(t+STEP+0.1);
+        });
+      });
+      // Bird-like trill on top
+      [0.5,1.5,2.3,3.1,3.9,5.1,6.2,7.0,8.1,9.2,10.3,11.4,12.5,13.6,14.7,15.8].forEach(d=>{
+        const f=2000+Math.random()*400;
+        const t=startT+d;
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(masterGain);o.type='sine';o.frequency.value=f;
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.04,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+        o.start(t);o.stop(t+0.15);
+      });
+      const loopDur=CHORDS.length*STEP;
+      setTimeout(()=>scheduleLoop(startT+loopDur),(loopDur-0.5)*1000);
+    }
+    scheduleLoop(ctx.currentTime);
+    masterGain.gain.setValueAtTime(1,ctx.currentTime+55);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+60);
+    return ()=>{stopped=true;masterGain.gain.cancelScheduledValues(ctx.currentTime);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5);};
+  },
+
+  // 3. 律动节拍 — 90bpm groove, 60s
+  rhythm(ctx){
+    const BPM=90,BEAT=60/BPM,BAR=BEAT*4;
+    const masterGain=ctx.createGain();masterGain.connect(ctx.destination);masterGain.gain.value=1;
+    let stopped=false;
+    function noiseBuffer(){
+      const b=ctx.createBuffer(1,ctx.sampleRate*0.06,ctx.sampleRate),d=b.getChannelData(0);
+      for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.4));
+      return b;
+    }
+    const snareNoiseBuf=(()=>{const b=ctx.createBuffer(1,ctx.sampleRate*0.18,ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.25));return b;})();
+    function kick(t){
+      const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(masterGain);o.type='sine';
+      o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(40,t+0.1);
+      g.gain.setValueAtTime(0.5,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);o.start(t);o.stop(t+0.28);
+    }
+    function snare(t){
+      const src=ctx.createBufferSource(),g=ctx.createGain();
+      src.buffer=snareNoiseBuf;src.connect(g);g.connect(masterGain);
+      g.gain.setValueAtTime(0.30,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.18);src.start(t);src.stop(t+0.20);
+    }
+    // Pre-bake one hi-hat buffer to avoid creating many per bar
+    const _hihatBuf=(()=>{const b=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.06),ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.4));return b;})();
+    function hihat(t,vol=0.2){
+      const src=ctx.createBufferSource(),g=ctx.createGain();
+      src.buffer=_hihatBuf;src.connect(g);g.connect(masterGain);
+      g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.05);src.start(t);src.stop(t+0.07);
+    }
+    function bass(t,f){
+      const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(masterGain);o.type='sawtooth';o.frequency.value=f;
+      g.gain.setValueAtTime(0.12,t);g.gain.exponentialRampToValueAtTime(0.001,t+BEAT*0.85);o.start(t);o.stop(t+BEAT);
+    }
+    const BASS_LINE=[65,65,73,65,58,65,73,82]; // E1 groove
+    function scheduleBar(startT){
+      if(stopped)return;
+      // Kick pattern: 1, 2.5, 3
+      kick(startT);kick(startT+BEAT*1.5);kick(startT+BEAT*2);
+      // Snare: 2, 4
+      snare(startT+BEAT);snare(startT+BEAT*3);
+      // 8th note hi-hats
+      for(let i=0;i<8;i++) hihat(startT+i*BEAT*0.5, i%2===0?0.22:0.15);
+      // Bass line
+      BASS_LINE.forEach((f,i)=>bass(startT+i*BEAT*0.5,f));
+      // Lead melody (pentatonic phrase every 2 bars)
+      if(Math.round(startT/BAR)%2===0){
+        [0,0.67,1.0,1.5,2.0,2.5,3.0,3.5].forEach((d,i)=>{
+          const mel=[392,440,494,523,587,494,440,392];
+          const t=startT+d*BEAT;
+          const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(masterGain);
+          o.type='square';o.frequency.value=mel[i];
+          g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+BEAT*0.45);o.start(t);o.stop(t+BEAT*0.5);
+        });
+      }
+      setTimeout(()=>scheduleBar(startT+BAR),(BAR-0.1)*1000);
+    }
+    scheduleBar(ctx.currentTime);
+    masterGain.gain.setValueAtTime(1,ctx.currentTime+55);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+60);
+    return ()=>{stopped=true;masterGain.gain.cancelScheduledValues(ctx.currentTime);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.2);};
+  },
+
+  // 4. 活力冲刺 — 140bpm driving energy, 60s
+  energy(ctx){
+    const BPM=140,BEAT=60/BPM,BAR=BEAT*4;
+    const masterGain=ctx.createGain();masterGain.connect(ctx.destination);masterGain.gain.value=1;
+    let stopped=false;
+    // Pre-bake noise buffers once to avoid per-beat allocation noise
+    const _snBuf=(()=>{const b=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.15),ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.28));return b;})();
+    const _hatBuf=(()=>{const b=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.04),ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.3));return b;})();
+    const _ohatBuf=(()=>{const b=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.10),ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.3));return b;})();
+    function kick(t){
+      const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(masterGain);o.type='sine';
+      o.frequency.setValueAtTime(180,t);o.frequency.exponentialRampToValueAtTime(40,t+0.1);
+      g.gain.setValueAtTime(0.55,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);o.start(t);o.stop(t+0.22);
+    }
+    function snare(t){
+      const src=ctx.createBufferSource(),g=ctx.createGain();
+      src.buffer=_snBuf;src.connect(g);g.connect(masterGain);
+      g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.15);src.start(t);src.stop(t+0.18);
+    }
+    function hat(t,open=false){
+      const src=ctx.createBufferSource(),g=ctx.createGain();
+      src.buffer=open?_ohatBuf:_hatBuf;src.connect(g);g.connect(masterGain);
+      const dur=open?0.10:0.04;
+      g.gain.setValueAtTime(open?0.15:0.20,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);src.start(t);src.stop(t+dur+0.02);
+    }
+    const CHORD_PROG=[[523,659,784],[587,740,880],[493,622,740],[523,659,784]];
+    function chord(t,freqs){
+      freqs.forEach(f=>{
+        const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(masterGain);o.type='sawtooth';o.frequency.value=f;
+        g.gain.setValueAtTime(0.06,t);g.gain.exponentialRampToValueAtTime(0.001,t+BEAT*0.9);o.start(t);o.stop(t+BEAT);
+      });
+    }
+    const LEAD=[784,880,784,659,784,880,1047,880];
+    function scheduleBar(startT){
+      if(stopped)return;
+      // Kicks: every beat + extra on 1.5
+      [0,BEAT,BEAT*1.5,BEAT*2,BEAT*3].forEach(d=>kick(startT+d));
+      // Snares: 2 and 4
+      snare(startT+BEAT);snare(startT+BEAT*3);
+      // 16th hi-hats
+      for(let i=0;i<16;i++) hat(startT+i*BEAT*0.25,i%4===2);
+      // Chords each beat
+      const barIdx=Math.round(startT/BAR)%CHORD_PROG.length;
+      for(let b=0;b<4;b++) chord(startT+b*BEAT,CHORD_PROG[(barIdx+b)%CHORD_PROG.length]);
+      // Lead melody every 2 bars
+      if(Math.round(startT/BAR)%2===0){
+        LEAD.forEach((f,i)=>{
+          const t=startT+i*BEAT*0.5;
+          const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(masterGain);o.type='square';o.frequency.value=f;
+          g.gain.setValueAtTime(0.08,t);g.gain.exponentialRampToValueAtTime(0.001,t+BEAT*0.45);o.start(t);o.stop(t+BEAT*0.5);
+        });
+      }
+      setTimeout(()=>scheduleBar(startT+BAR),(BAR-0.1)*1000);
+    }
+    scheduleBar(ctx.currentTime);
+    masterGain.gain.setValueAtTime(1,ctx.currentTime+55);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+60);
+    return ()=>{stopped=true;masterGain.gain.cancelScheduledValues(ctx.currentTime);masterGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.2);};
+  }
+};
+
+const TONE_NAMES=['gentle','forest','rhythm','energy'];
+
+function playTone(name,isPreview){
+  try{
+    const stopRef=isPreview?'previewStop':'currentAlarmStop';
+    if(window[stopRef]){window[stopRef]();window[stopRef]=null;}
+    if(!isPreview&&previewStop){previewStop();previewStop=null;}
+    const ctx=getCtx();if(!ctx)return;
+    let stopFn;
+    if(name==='custom'&&customAudioBuffer){
+      let activeSrc=null,activeGain=null,customStopped=false;
+      // shouldRepeat: for alarm playback, check the alarm's repeat setting; for preview always false
+      function playCustomOnce(){
+        if(customStopped)return;
+        try{
+          const src=ctx.createBufferSource(),g=ctx.createGain();
+          activeSrc=src;activeGain=g;
+          src.buffer=customAudioBuffer;
+          src.connect(g);g.connect(ctx.destination);
+          g.gain.value=0.8;
+          src.start(ctx.currentTime);
+          src.onended=function(){
+            if(!customStopped&&shouldRepeat) playCustomOnce();
+          };
+        }catch(e){console.error('custom play',e);}
+      }
+      playCustomOnce();
+      // For preview: auto-stop after 8s
+      if(isPreview){
+        const previewTimer=setTimeout(()=>{customStopped=true;try{if(activeSrc)activeSrc.stop();}catch{}},8000);
+        stopFn=()=>{customStopped=true;clearTimeout(previewTimer);try{if(activeGain){activeGain.gain.cancelScheduledValues(ctx.currentTime);activeGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.15);}setTimeout(()=>{try{if(activeSrc)activeSrc.stop();}catch{}},200);} catch{}};
+      } else {
+        stopFn=()=>{customStopped=true;try{if(activeGain){activeGain.gain.cancelScheduledValues(ctx.currentTime);activeGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.2);}setTimeout(()=>{try{if(activeSrc)activeSrc.stop();}catch{}},250);}catch{}};
+      }
+    } else {
+      const builder=TONE_BUILDERS[name]||TONE_BUILDERS.gentle;
+      stopFn=builder(ctx);
+      if(!isPreview)setTimeout(()=>{if(currentAlarmStop){currentAlarmStop();currentAlarmStop=null;}},61000);
+    }
+    if(isPreview){
+      previewStop=stopFn;
+      setTimeout(()=>{if(previewStop){previewStop();previewStop=null;}},8000);
+    } else {
+      currentAlarmStop=stopFn;
+    }
+  }catch(e){console.error('playTone',e);}
+}
+
+/* ══ CLOCK ══ */
+function buildClock(body){
+  body.innerHTML=`<div class="clock-time" id="ct">00:00:00</div>
+    <div class="clock-sub"><span id="cd"></span><span class="clock-week" id="cw"></span></div>`;
+  function tick(){
+    const n=new Date();
+    document.getElementById('ct').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+    document.getElementById('cd').textContent=`${n.getFullYear()}.${pad(n.getMonth()+1)}.${pad(n.getDate())}`;
+    document.getElementById('cw').textContent=Tfw(n.getDay());
+    checkAlarms(n);
+  }
+  setInterval(tick,1000);tick();
+}
+function updateClockLabels(){
+  const el=document.getElementById('cw');
+  if(el)el.textContent=Tfw(new Date().getDay());
+}
+
+/* ══ CALENDAR ══ */
+function buildCalendar(body){
+  body.innerHTML=`<div class="cal-nav">
+      <button class="nav-btn" id="cp">‹</button>
+      <span class="cal-nav-lbl" id="cl"></span>
+      <button class="nav-btn" id="cn">›</button>
+    </div>
+    <div class="cal-grid" id="cg"></div>`;
+  document.getElementById('cp').addEventListener('click',()=>chMo(-1));
+  document.getElementById('cn').addEventListener('click',()=>chMo(1));
+  renderCal();
+  // Auto-refresh at midnight so today highlight stays correct
+  let _calDay=new Date().getDate();
+  setInterval(()=>{const d=new Date().getDate();if(d!==_calDay){_calDay=d;const n=new Date();vY=n.getFullYear();vM=n.getMonth();renderCal();}},60000);
+}
+function chMo(delta){vM+=delta;if(vM>11){vM=0;vY++;}if(vM<0){vM=11;vY--;}renderCal();}
+function renderCal(){
+  const lbl=document.getElementById('cl'),g=document.getElementById('cg');if(!lbl||!g)return;
+  const ry=vY,rm=vM;
+  lbl.textContent=`${ry}.${pad(rm+1)}`;
+  g.innerHTML='';
+  // Use localized weekday names
+  for(let i=0;i<7;i++){const d=document.createElement('div');d.className='cal-wd';d.textContent=Tw(i);g.appendChild(d);}
+  const fd=new Date(ry,rm,1).getDay(),dim=new Date(ry,rm+1,0).getDate(),prevDim=new Date(ry,rm,0).getDate(),now=new Date();
+  for(let i=fd-1;i>=0;i--){const c=document.createElement('div');c.className='cal-d other';c.textContent=prevDim-i;g.appendChild(c);}
+  for(let d=1;d<=dim;d++){
+    const dd=d,k=toKey(ry,rm,dd);
+    const isT=now.getFullYear()===ry&&now.getMonth()===rm&&now.getDate()===dd;
+    const hasDot=(D.todos[k]?.length>0)||!!D.memos[k]||D.alarms.some(a=>a.date===k);
+    const c=document.createElement('div');
+    c.className='cal-d'+(isT?' today':'')+(selKey===k&&!isT?' selected':'')+(hasDot?' has-dot':'');
+    c.textContent=dd;c.addEventListener('click',()=>openDayPopup(ry,rm,dd));g.appendChild(c);
+  }
+  const rem=(fd+dim)%7===0?0:7-((fd+dim)%7);
+  for(let d=1;d<=rem;d++){const c=document.createElement('div');c.className='cal-d other';c.textContent=d;g.appendChild(c);}
+}
+
+/* Day popup */
+function openDayPopup(y,m,d){
+  selKey=toKey(y,m,d);renderCal();
+  document.getElementById('popup-date-lbl').textContent=`${y}年${pad(m+1)}月${d}日`;
+  const cont=document.getElementById('popup-content');
+  cont.innerHTML='';
+
+  const todos=D.todos[selKey]||[];
+  const alarms=D.alarms.filter(a=>a.date===selKey);
+
+  // ── Parse schedule items for this day ──
+  let schItems=[];
+  try{
+    const raw=D.memos[selKey];
+    if(raw){const p=JSON.parse(raw);schItems=Array.isArray(p)?p:[];}
+  }catch{
+    const raw=D.memos[selKey];
+    if(raw&&typeof raw==='string')schItems=[{id:'_',text:raw,startTime:'',endTime:'',done:false}];
+  }
+
+  // ── Todos section ──
+  const todoSec=document.createElement('div');todoSec.className='popup-sec';
+  const todoTitle=document.createElement('div');todoTitle.className='popup-sec-title';
+  todoTitle.textContent=T('popup_todo')+' ('+todos.length+')';
+  todoSec.appendChild(todoTitle);
+  if(todos.length){
+    todos.forEach(t=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:6px;padding:3px 0';
+      const chk=document.createElement('div');chk.className='chk'+(t.done?' done':'');chk.textContent=t.done?'✓':'';
+      chk.dataset.tid=t.id;chk.addEventListener('click',()=>popupToggleTodo(t.id));
+      const txt=document.createElement('span');
+      txt.style.cssText='font-size:12px;color:var(--text-color);flex:1;'+(t.done?'text-decoration:line-through;opacity:0.5':'');
+      txt.textContent=t.text;
+      const del=document.createElement('button');del.className='del-btn';del.style.opacity='0.5';del.textContent='×';
+      del.addEventListener('click',()=>popupDelTodo(t.id));
+      row.append(chk,txt,del);todoSec.appendChild(row);
+    });
+  }else{
+    const empty=document.createElement('div');empty.className='empty';empty.style.textAlign='left';empty.textContent=T('none');
+    todoSec.appendChild(empty);
+  }
+  const todoAdd=document.createElement('div');todoAdd.style.cssText='display:flex;gap:5px;margin-top:6px';
+  const todoInp=document.createElement('input');todoInp.className='inp';todoInp.id='pt-inp';todoInp.placeholder=T('add_todo');todoInp.style.flex='1';
+  const todoBtn=document.createElement('button');todoBtn.className='add-btn';todoBtn.textContent='+';todoBtn.addEventListener('click',popupAddTodo);
+  todoInp.addEventListener('keydown',e=>{if(e.key==='Enter')popupAddTodo();});
+  todoAdd.append(todoInp,todoBtn);todoSec.appendChild(todoAdd);
+  cont.appendChild(todoSec);
+
+  // ── Schedule/Memo section ──
+  const schSec=document.createElement('div');schSec.className='popup-sec';
+  const schTitle=document.createElement('div');schTitle.className='popup-sec-title';
+  schTitle.textContent=T('popup_memo')+' ('+schItems.length+')';
+  schSec.appendChild(schTitle);
+  const schSorted=[...schItems].sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
+  if(schSorted.length){
+    schSorted.forEach(it=>{
+      const block=document.createElement('div');
+      block.style.cssText='background:var(--accent);border-radius:6px;padding:5px 8px;margin-bottom:3px;';
+      const timeStr=(it.startTime&&it.endTime)?it.startTime+' – '+it.endTime:(it.startTime||it.time||'');
+      if(timeStr){const tEl=document.createElement('div');tEl.style.cssText='font-size:10px;color:rgba(255,255,255,0.8)';tEl.textContent=timeStr;block.appendChild(tEl);}
+      const tEl2=document.createElement('div');tEl2.style.cssText='font-size:12px;font-weight:500;color:#fff;'+(it.done?'text-decoration:line-through;opacity:0.6':'');tEl2.textContent=it.text;
+      block.appendChild(tEl2);schSec.appendChild(block);
+    });
+  }else{
+    const empty=document.createElement('div');empty.className='empty';empty.style.textAlign='left';empty.textContent=T('none');
+    schSec.appendChild(empty);
+  }
+  cont.appendChild(schSec);
+
+  // ── Alarms section ──
+  const alarmSec=document.createElement('div');alarmSec.className='popup-sec';
+  const alarmTitle=document.createElement('div');alarmTitle.className='popup-sec-title';
+  alarmTitle.textContent=T('popup_alarm')+' ('+alarms.length+')';
+  alarmSec.appendChild(alarmTitle);
+  if(alarms.length){
+    alarms.forEach(a=>{
+      const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:6px;padding:2px 0';
+      const tEl=document.createElement('span');tEl.style.cssText='font-size:12px;color:var(--accent)';tEl.textContent='⏰ '+a.time;
+      const lEl=document.createElement('span');lEl.style.cssText='flex:1;font-size:11px;color:var(--text-color)';lEl.textContent=a.label;
+      const tnEl=document.createElement('span');tnEl.style.cssText='font-size:10px;color:var(--text2)';tnEl.textContent=toneLabel(a.tone);
+      const sw=document.createElement('button');sw.className='sw'+(a.on?' on':'');sw.dataset.aid=a.id;sw.addEventListener('click',()=>popupToggleAlarm(a.id));
+      const del=document.createElement('button');del.className='del-btn';del.style.opacity='0.5';del.textContent='×';del.addEventListener('click',()=>popupDelAlarm(a.id));
+      row.append(tEl,lEl,tnEl,sw,del);alarmSec.appendChild(row);
+    });
+  }else{
+    const empty=document.createElement('div');empty.className='empty';empty.style.textAlign='left';empty.textContent=T('none');
+    alarmSec.appendChild(empty);
+  }
+  const toneOpts=[...TONE_NAMES,'custom'].map(n=>`<option value="${n}">${toneLabel(n)}</option>`).join('');
+  const alarmAdd=document.createElement('div');alarmAdd.style.cssText='display:flex;gap:4px;margin-top:6px;flex-wrap:wrap';
+  alarmAdd.innerHTML=`<input type="time" class="inp inp-time" id="pa-time" value="08:00"><select class="tone-sel" id="pa-tone">${toneOpts}</select><input class="inp" id="pa-lbl" placeholder="${T('add_alarm_lbl')}" style="flex:1;min-width:60px"><button class="add-btn" id="pa-add">+</button>`;
+  alarmSec.appendChild(alarmAdd);
+  cont.appendChild(alarmSec);
+
+  // Bind alarm add
+  document.getElementById('pa-lbl').addEventListener('keydown',e=>{if(e.key==='Enter')popupAddAlarm();});
+  document.getElementById('pa-add').addEventListener('click',popupAddAlarm);
+
+  document.getElementById('day-popup').classList.add('open');
+}
+function closePopup(){selKey='';document.getElementById('day-popup').classList.remove('open');renderCal();}
+document.getElementById('popup-close-btn').addEventListener('click',closePopup);
+document.getElementById('day-popup').addEventListener('click',e=>{if(e.target===document.getElementById('day-popup'))closePopup();});
+function reopenPopup(){if(selKey){const[y,m,d]=selKey.split('-');openDayPopup(parseInt(y),parseInt(m)-1,parseInt(d));}}
+async function popupAddTodo(){const inp=document.getElementById('pt-inp');if(!inp||!selKey)return;const txt=inp.value.trim();if(!txt)return;if(!D.todos[selKey])D.todos[selKey]=[];D.todos[selKey].push({id:uid(),text:txt,done:false});inp.value='';await saveD();reopenPopup();}
+async function popupToggleTodo(id){const t=(D.todos[selKey]||[]).find(x=>x.id===id);if(t){t.done=!t.done;await saveD();reopenPopup();}}
+async function popupDelTodo(id){D.todos[selKey]=(D.todos[selKey]||[]).filter(x=>x.id!==id);await saveD();reopenPopup();}
+async function popupAddAlarm(){const t=document.getElementById('pa-time')?.value,tone=document.getElementById('pa-tone')?.value||'gentle',l=document.getElementById('pa-lbl')?.value.trim()||'';if(!t||!selKey)return;D.alarms.push({id:uid(),date:selKey,time:t,label:l,tone,on:true});document.getElementById('pa-lbl').value='';await saveD();showToast(T('alarm_set'),selKey+' '+t,'⏰',true);reopenPopup();}
+async function popupToggleAlarm(id){const a=D.alarms.find(x=>x.id===id);if(!a)return;a.on=!a.on;fired.delete(a.id);if(!a.on){if(currentAlarmStop){currentAlarmStop();currentAlarmStop=null;}window.api?.broadcastAlarmStop(id);}await saveD();reopenPopup();}
+async function popupDelAlarm(id){D.alarms=D.alarms.filter(x=>x.id!==id);await saveD();reopenPopup();}
+
+/* ══ TODO module ══ */
+let todoSel;
+function buildTodo(body){
+  todoSel=todayKey();
+  body.innerHTML=`
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:2px">
+      <span style="font-size:9px;color:var(--text2);letter-spacing:2px;text-transform:uppercase" id="todo-hdr">${T('mod_todo')}</span>
+      <span style="font-size:10px;color:var(--text2)">${todoSel.slice(5).replace('-','/')}</span>
+    </div>
+    <div class="todo-list" id="todo-list"></div>
+    <div class="add-row">
+      <input class="inp" id="td-inp" placeholder="${T('add_todo')}" maxlength="60">
+      <button class="add-btn" id="td-add">+</button>
+    </div>`;
+  document.getElementById('td-add').addEventListener('click',addTodo);
+  document.getElementById('td-inp').addEventListener('keydown',e=>{if(e.key==='Enter')addTodo();});
+  renderTodos();
+  // Auto-update date label and data at midnight
+  let _todoDay=new Date().getDate();
+  setInterval(()=>{
+    const d=new Date().getDate();
+    if(d!==_todoDay){
+      _todoDay=d;todoSel=todayKey();
+      // Update the date label (second span in the header)
+      const hdr=document.getElementById('todo-hdr');
+      if(hdr&&hdr.nextElementSibling)hdr.nextElementSibling.textContent=todoSel.slice(5).replace('-','/');
+      renderTodos();
+    }
+  },60000);
+}
+function renderTodos(){
+  const list=document.getElementById('todo-list');if(!list)return;
+  const el=document.getElementById('todo-hdr');if(el)el.textContent=T('mod_todo');
+  const items=D.todos[todoSel]||[];
+  if(!items.length){list.innerHTML=`<div class="empty">${T('empty_todo')}</div>`;return;}
+  list.innerHTML='';
+  items.forEach(t=>{
+    const row=document.createElement('div');row.className='todo-item';
+    const chk=document.createElement('div');chk.className='chk'+(t.done?' done':'');chk.textContent=t.done?'✓':'';chk.addEventListener('click',()=>toggleTodo(t.id));
+    const txt=document.createElement('div');txt.className='todo-txt'+(t.done?' done':'');txt.textContent=t.text;
+    const del=document.createElement('button');del.className='del-btn';del.textContent='×';del.addEventListener('click',()=>delTodo(t.id));
+    row.append(chk,txt,del);list.appendChild(row);
+  });
+}
+async function addTodo(){const inp=document.getElementById('td-inp');if(!inp)return;const txt=inp.value.trim();if(!txt)return;if(!D.todos[todoSel])D.todos[todoSel]=[];D.todos[todoSel].push({id:uid(),text:txt,done:false});inp.value='';await saveD();renderTodos();}
+async function toggleTodo(id){const t=(D.todos[todoSel]||[]).find(x=>x.id===id);if(t){t.done=!t.done;await saveD();renderTodos();}}
+async function delTodo(id){D.todos[todoSel]=(D.todos[todoSel]||[]).filter(x=>x.id!==id);await saveD();renderTodos();}
+
+/* ══ SCHEDULE module (formerly memo) ══ */
+let memoSel;
+function buildMemo(body){
+  memoSel=todayKey();
+  body.innerHTML=`
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:4px">
+      <span style="font-size:9px;color:var(--text2);letter-spacing:2px;text-transform:uppercase" id="sch-hdr">${T('mod_memo')}</span>
+    </div>
+    <div id="sch-list" style="flex:1;overflow-y:auto;margin-bottom:6px;"></div>
+    <div style="flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:5px;">
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <input type="date" class="inp inp-date" id="sch-date" value="${todayKey()}" style="flex:1;min-width:110px">
+        <input type="time" class="inp inp-time" id="sch-start" value="09:00" style="flex:none;width:78px">
+        <span style="display:flex;align-items:center;font-size:11px;color:var(--text2)">→</span>
+        <input type="time" class="inp inp-time" id="sch-end" value="10:00" style="flex:none;width:78px">
+      </div>
+      <div style="display:flex;gap:4px">
+        <input class="inp" id="sch-inp" placeholder="${T('sch_placeholder')}" maxlength="60" style="flex:1">
+        <button class="add-btn" id="sch-add">+</button>
+      </div>
+    </div>`;
+  document.getElementById('sch-add').addEventListener('click',addScheduleItem);
+  document.getElementById('sch-inp').addEventListener('keydown',e=>{if(e.key==='Enter')addScheduleItem();});
+  renderMemo();
+}
+
+// Get ALL schedule items across all dates, sorted
+function getAllScheduleItems(){
+  const all=[];
+  Object.keys(D.memos).forEach(dateKey=>{
+    try{
+      const raw=D.memos[dateKey];
+      if(!raw)return;
+      const parsed=JSON.parse(raw);
+      if(Array.isArray(parsed)){
+        parsed.forEach(it=>all.push({...it,date:dateKey}));
+      }else if(typeof raw==='string'&&raw.trim()){
+        all.push({id:uid(),text:raw,date:dateKey,startTime:'',endTime:'',done:false});
+      }
+    }catch{
+      const raw=D.memos[dateKey];
+      if(raw&&typeof raw==='string')all.push({id:uid(),text:raw,date:dateKey,startTime:'',endTime:'',done:false});
+    }
+  });
+  return all.sort((a,b)=>{
+    if(a.date!==b.date)return a.date.localeCompare(b.date);
+    const ta=a.startTime||'';const tb=b.startTime||'';
+    if(!ta&&!tb)return 0;if(!ta)return 1;if(!tb)return -1;
+    return ta.localeCompare(tb);
+  });
+}
+
+function renderMemo(){
+  const list=document.getElementById('sch-list');if(!list)return;
+  const hdr=document.getElementById('sch-hdr');if(hdr)hdr.textContent=T('mod_memo');
+  const items=getAllScheduleItems();
+  if(!items.length){list.innerHTML=`<div class="empty">${T('sch_empty')}</div>`;return;}
+  list.innerHTML='';
+  // Group by date — Mac Calendar style
+  let lastDate='';
+  items.forEach(item=>{
+    // Date header
+    if(item.date!==lastDate){
+      lastDate=item.date;
+      const now=todayKey();
+      const dh=document.createElement('div');
+      dh.style.cssText='font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);padding:6px 0 2px;font-weight:600;';
+      dh.textContent=item.date===now?T('today'):item.date.slice(5).replace('-','/');
+      list.appendChild(dh);
+    }
+    // Event block — Mac Calendar style
+    const block=document.createElement('div');
+    const color=item.done?'rgba(0,0,0,0.08)':'var(--accent)';
+    const textColor=item.done?'var(--text2)':'#fff';
+    block.style.cssText=`background:${color};border-radius:6px;padding:5px 8px;margin-bottom:4px;position:relative;cursor:default;transition:opacity 0.15s;`;
+    // Time range
+    const timeStr=(item.startTime&&item.endTime)?`${item.startTime} – ${item.endTime}`:(item.startTime||item.time||'');
+    const timeEl=document.createElement('div');
+    timeEl.style.cssText=`font-size:10px;color:${item.done?'var(--text2)':'rgba(255,255,255,0.8)'};margin-bottom:1px;`;
+    timeEl.textContent=timeStr;
+    // Title
+    const titleEl=document.createElement('div');
+    titleEl.style.cssText=`font-size:12px;font-weight:500;color:${textColor};${item.done?'text-decoration:line-through;':''}`;
+    titleEl.textContent=item.text;
+    // Checkbox (circle)
+    const chk=document.createElement('div');
+    chk.style.cssText=`position:absolute;right:28px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;border:1.5px solid ${item.done?'var(--green)':'rgba(255,255,255,0.6)'};background:${item.done?'var(--green)':'transparent'};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;`;
+    if(item.done)chk.textContent='✓';
+    chk.addEventListener('click',e=>{e.stopPropagation();toggleScheduleItem(item.id,item.date);});
+    // Delete
+    const del=document.createElement('button');
+    del.style.cssText='position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:13px;opacity:0;padding:0 2px;';
+    del.textContent='×';
+    del.addEventListener('click',e=>{e.stopPropagation();delScheduleItem(item.id,item.date);});
+    block.addEventListener('mouseenter',()=>del.style.opacity='1');
+    block.addEventListener('mouseleave',()=>del.style.opacity='0');
+    if(timeStr)block.append(timeEl);
+    block.append(titleEl,chk,del);
+    list.appendChild(block);
+  });
+}
+
+async function addScheduleItem(){
+  const inp=document.getElementById('sch-inp');if(!inp)return;
+  const text=inp.value.trim();if(!text)return;
+  const dateKey=document.getElementById('sch-date')?.value||todayKey();
+  const startTime=document.getElementById('sch-start')?.value||'';
+  const endTime=document.getElementById('sch-end')?.value||'';
+  inp.value='';
+  let items=[];
+  try{const raw=D.memos[dateKey];if(raw){const p=JSON.parse(raw);items=Array.isArray(p)?p:[];}}catch{}
+  const newItem={id:uid(),text,date:dateKey,startTime,endTime,done:false};
+  items.push(newItem);
+  D.memos[dateKey]=JSON.stringify(items);
+  await saveD();renderMemo();
+  showToast(T('sch_added'),text,'📅',false);
+}
+
+async function toggleScheduleItem(id,dateKey){
+  const dk=dateKey||memoSel;
+  let items=[];
+  try{const raw=D.memos[dk];if(raw){const p=JSON.parse(raw);items=Array.isArray(p)?p:[];}}catch{}
+  const it=items.find(x=>x.id===id);
+  if(it){it.done=!it.done;D.memos[dk]=JSON.stringify(items);await saveD();renderMemo();}
+}
+async function delScheduleItem(id,dateKey){
+  const dk=dateKey||memoSel;
+  let items=[];
+  try{const raw=D.memos[dk];if(raw){const p=JSON.parse(raw);items=Array.isArray(p)?p:[];}}catch{}
+  items=items.filter(x=>x.id!==id);
+  if(items.length)D.memos[dk]=JSON.stringify(items);else delete D.memos[dk];
+  await saveD();renderMemo();
+}
+async function syncToCalendar(item){
+  // Add as alarm on this date
+  D.alarms.push({id:uid(),date:memoSel,time:item.time,label:item.text,tone:'gentle',on:true});
+  await saveD();showToast(T('sch_synced'),`${memoSel} ${item.time}`,'🔔',false);
+}
+async function saveMemo(){}  // kept for compatibility
+
+
+/* ══ ALARM module ══ */
+const fired=new Set();
+function buildAlarm(body){
+  const toneOpts=[...TONE_NAMES,'custom'].map(n=>`<option value="${n}">${toneLabel(n)}</option>`).join('');
+  body.innerHTML=`
+    <div class="alarm-list" id="al-list"></div>
+    <div style="flex-shrink:0;display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <input type="date" class="inp inp-date" id="al-date" value="${todayKey()}">
+        <input type="time" class="inp inp-time" id="al-time" value="08:00">
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <select class="tone-sel" id="al-tone" style="flex:1">${toneOpts}</select>
+        <button class="add-btn" id="al-preview" title="${T('tone_preview')}"
+          style="width:26px;height:26px;font-size:13px;background:var(--accent2)">▶</button>
+        <label style="cursor:pointer;-webkit-app-region:no-drag" title="${T('tone_upload')}">
+          <span class="add-btn" style="width:26px;height:26px;font-size:13px;background:var(--surface);
+            border:1px solid var(--border);color:var(--text2);display:flex;align-items:center;justify-content:center">📁</span>
+          <input type="file" id="al-upload" accept="audio/*" style="display:none">
+        </label>
+      </div>
+      <div style="display:flex;gap:4px">
+        <input class="inp" id="al-lbl" placeholder="${T('add_alarm_lbl')}" maxlength="30" style="flex:1">
+        <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text2);cursor:pointer;flex-shrink:0;-webkit-app-region:no-drag" title="${T('alarm_repeat')}"><input type="checkbox" id="al-repeat" style="-webkit-app-region:no-drag">↻</label>
+        <button class="add-btn" id="al-add">+</button>
+      </div>
+      <div id="al-custom-name" style="font-size:10px;color:var(--accent2);display:none"></div>
+    </div>`;
+  document.getElementById('al-add').addEventListener('click',addAlarm);
+  document.getElementById('al-lbl').addEventListener('keydown',e=>{if(e.key==='Enter')addAlarm();});
+  // Preview button
+  document.getElementById('al-preview').addEventListener('click',()=>{
+    const tone=document.getElementById('al-tone').value;
+    if(previewStop){previewStop();previewStop=null;document.getElementById('al-preview').textContent='▶';return;}
+    playTone(tone,true);
+    document.getElementById('al-preview').textContent='■';
+    setTimeout(()=>{document.getElementById('al-preview').textContent='▶';},8100);
+  });
+  // File upload — safe callback form, size limit 80MB (~5min audio)
+  document.getElementById('al-upload').addEventListener('change',function(){
+    const file=this.files[0];if(!file)return;
+    const nameEl=document.getElementById('al-custom-name');
+    nameEl.style.display='block';
+    if(file.size>80*1024*1024){nameEl.textContent='⚠ 文件过大 (max 80MB)';return;}
+    if(!/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name)){nameEl.textContent='⚠ 不支持的格式';return;}
+    nameEl.textContent='⏳ 加载中…';
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        // Slice a copy — original is transferred by decodeAudioData and cannot be reused
+        const ab=e.target.result.slice(0);
+        const ctx=getCtx();
+        // Callback form is required in Electron — Promise form can crash the renderer
+        ctx.decodeAudioData(
+          ab,
+          function(buffer){
+            customAudioBuffer=buffer;
+            customAudioName=file.name.replace(/\.[^.]+$/,'');
+            nameEl.textContent='✓ '+customAudioName;
+            const sel=document.getElementById('al-tone');
+            if(sel) sel.value='custom';
+            // Auto-preview 2s
+            playTone('custom',true);
+          },
+          function(err){
+            nameEl.textContent='⚠ 解码失败，请用 MP3 或 WAV';
+            console.error('decode error:',err);
+          }
+        );
+      }catch(err){
+        nameEl.textContent='⚠ '+err.message;
+        console.error('upload catch:',err);
+      }
+    };
+    reader.onerror=function(){nameEl.textContent='⚠ 读取失败';};
+    reader.readAsArrayBuffer(file);
+  });
+  renderAlarms();
+}
+function renderAlarms(){
+  const list=document.getElementById('al-list');if(!list)return;
+  // Refresh tone select options (lang may have changed)
+  const sel=document.getElementById('al-tone');
+  if(sel){const cur=sel.value;sel.innerHTML=[...TONE_NAMES,'custom'].map(n=>`<option value="${n}">${toneLabel(n)}</option>`).join('');sel.value=cur;}
+  const sorted=[...D.alarms].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  if(!sorted.length){list.innerHTML=`<div class="empty">${T('empty_alarm')}</div>`;return;}
+  list.innerHTML='';
+  sorted.forEach(a=>{
+    const row=document.createElement('div');row.className='alarm-item';
+    const time=document.createElement('div');time.className='alarm-time';time.textContent=a.time;
+    const lbl=document.createElement('div');lbl.className='alarm-lbl';lbl.textContent=a.label;
+    const dt=document.createElement('div');dt.className='alarm-date';dt.textContent=a.date||'';
+    const tn=document.createElement('div');tn.className='alarm-tone';tn.textContent=toneLabel(a.tone);
+    const sw=document.createElement('button');sw.className='sw'+(a.on?' on':'');sw.addEventListener('click',()=>toggleAlarm(a.id));
+    const del=document.createElement('button');del.className='del-btn';del.textContent='×';del.addEventListener('click',()=>delAlarm(a.id));
+    row.addEventListener('mouseenter',()=>del.style.opacity='1');
+    row.addEventListener('mouseleave',()=>del.style.opacity='0');
+    if(a.repeat){const rep=document.createElement('span');rep.textContent='↻';rep.style.cssText='font-size:11px;color:var(--accent2);';row.insertBefore(rep,sw);}
+    row.append(time,lbl,dt,tn,sw,del);list.appendChild(row);
+  });
+}
+async function addAlarm(){
+  const t=document.getElementById('al-time')?.value,dt=document.getElementById('al-date')?.value,
+        tone=document.getElementById('al-tone')?.value||'gentle',l=document.getElementById('al-lbl')?.value.trim()||'';
+  const repeat=document.getElementById('al-repeat')?.checked||false;
+  if(!t)return;D.alarms.push({id:uid(),date:dt||todayKey(),time:t,label:l,tone,on:true,repeat});
+  document.getElementById('al-lbl').value='';await saveD();renderAlarms();showToast(T('alarm_set'),`${dt||''} ${t}`,'⏰',true);
+}
+async function toggleAlarm(id){
+  const a=D.alarms.find(x=>x.id===id);if(!a)return;
+  a.on=!a.on;
+  fired.delete(a.id);
+  if(!a.on){
+    // Stop local audio if playing
+    if(currentAlarmStop){ currentAlarmStop(); currentAlarmStop=null; }
+    // Broadcast stop to all other windows too
+    window.api?.broadcastAlarmStop(id);
+  }
+  await saveD();renderAlarms();
+}
+async function delAlarm(id){D.alarms=D.alarms.filter(x=>x.id!==id);await saveD();renderAlarms();}
+function checkAlarms(now){
+  const cur=`${pad(now.getHours())}:${pad(now.getMinutes())}`,dk=todayKey();
+  D.alarms.forEach(a=>{
+    if(!a.on||(a.date&&a.date!==dk))return;
+    const fk=`${a.id}-${dk}`;
+    if(a.time===cur&&!fired.has(fk)){
+      fired.add(fk);
+      showToast(T('alarm_fired'),`${a.time} — ${a.label}`,'🔔',true);
+      // Broadcast alarm fire to ALL windows so any window can play/show it
+      window.api?.broadcastAlarmFire({id:a.id,tone:a.tone||'gentle',label:a.label});
+    }
+  });
+}
+
+/* ══ Toast ══ */
+function showToast(title,body,icon,isAlarm){
+  const c=document.getElementById('toasts');const div=document.createElement('div');div.className='toast'+(isAlarm?' alarm-t':'');
+  const x=document.createElement('button');x.className='t-x';x.textContent='×';x.addEventListener('click',()=>closeToast(div));
+  div.innerHTML=`<span>${icon}</span><div style="flex:1"><div class="t-ttl">${title}</div><div class="t-bdy">${esc(body)}</div></div>`;div.appendChild(x);c.appendChild(div);
+  setTimeout(()=>closeToast(div),isAlarm?9000:4000);
+}
+function closeToast(div){div.style.animation='tOut 0.2s ease forwards';setTimeout(()=>div.remove(),200);}
+
+/* ══ Init ══ */
+async function init(){
+  await loadCFG();await loadD();
+  const now=new Date();vY=now.getFullYear();vM=now.getMonth();selKey='';  // don't pre-select, let .today CSS handle today highlight
+  const body=document.getElementById('body');
+  if(MOD==='clock')    buildClock(body);
+  if(MOD==='calendar') buildCalendar(body);
+  if(MOD==='todo')     buildTodo(body);
+  if(MOD==='memo')     buildMemo(body);
+  if(MOD==='alarm')    buildAlarm(body);
+  if(MOD==='clock'){
+    setTimeout(async()=>{
+      const n=(D.todos[todayKey()]||[]).filter(t=>!t.done).length;
+      if(n>0)showToast(T('daily_remind'),T('daily_remain',{n}),'📋',false);
+    },2500);
+  }
+}
+init();
+</script>
+</body>
+</html>

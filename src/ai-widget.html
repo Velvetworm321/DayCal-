@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --accent:#FF8FAB;--accent2:#FFB347;--green:#6EE7A0;
+  --text:#1a1a2e;--text2:#8888aa;--text-color:#1a1a2e;
+  --card-bg:rgba(255,255,255,0.88);--surface:rgba(248,246,243,0.92);
+  --border:rgba(0,0,0,0.09);--border-hover:rgba(0,0,0,0.18);
+  --shadow:0 4px 24px rgba(0,0,0,0.10);--radius:14px;
+}
+html,body{width:100%;height:100%;background:transparent;overflow:hidden;
+  -webkit-user-select:none;user-select:none;
+  font-family:'Microsoft YaHei','PingFang SC','Segoe UI',sans-serif;font-size:13px;}
+
+#widget{width:100vw;height:100vh;background:var(--card-bg);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-radius:var(--radius);border:1px solid transparent;
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:border-color 0.2s,box-shadow 0.2s,background 0.3s;}
+#widget:hover:not(.frozen){border-color:var(--border-hover);box-shadow:var(--shadow);}
+
+/* ── Drag bar ── */
+#drag-bar{height:28px;background:transparent;border-bottom:1px solid transparent;
+  display:flex;align-items:center;padding:0 8px;gap:6px;
+  -webkit-app-region:drag;flex-shrink:0;
+  border-radius:var(--radius) var(--radius) 0 0;
+  transition:background 0.2s,border-color 0.2s,opacity 0.2s;
+  opacity:0;pointer-events:none;}
+#widget:hover:not(.frozen) #drag-bar{opacity:1;pointer-events:all;
+  background:var(--surface);border-bottom-color:var(--border);}
+#widget.frozen #drag-bar{opacity:0;pointer-events:all;}
+#widget.frozen:hover #drag-bar{opacity:1;pointer-events:all;
+  background:var(--surface);border-bottom-color:var(--border);}
+#widget.frozen #main-area{pointer-events:none;}
+button,input,textarea{-webkit-app-region:no-drag;}
+.dot-btn{width:11px;height:11px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;-webkit-app-region:no-drag;}
+.dot-close{background:#ff5f57;}.dot-pin{background:#28c840;}.dot-pin.off{background:#bbb;}
+.dot-lock{background:var(--accent);}.dot-lock.unlocked{background:#bbb;}
+.drag-title{flex:1;text-align:center;font-size:10px;color:var(--text2);letter-spacing:2px;pointer-events:none;-webkit-app-region:drag;}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--text2);font-size:12px;padding:2px 4px;border-radius:4px;transition:color 0.12s;-webkit-app-region:no-drag;}
+.icon-btn:hover{color:var(--accent);}
+
+/* ── Main area ── */
+#main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:10px 12px 12px;}
+
+/* ── API key screen ── */
+#key-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;}
+.key-icon{font-size:32px;line-height:1;}
+.key-title{font-size:13px;font-weight:600;color:var(--text-color);text-align:center;}
+.key-desc{font-size:11px;color:var(--text2);text-align:center;line-height:1.6;}
+.key-inp{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:12px;color:var(--text-color);outline:none;
+  -webkit-user-select:text;user-select:text;font-family:monospace;letter-spacing:1px;}
+.key-inp:focus{border-color:var(--accent);}
+.key-inp::placeholder{font-family:'Microsoft YaHei',sans-serif;letter-spacing:0;color:var(--text2);}
+.btn-primary{background:var(--accent);border:none;color:#fff;border-radius:8px;
+  padding:8px 20px;font-size:12px;cursor:pointer;font-family:inherit;transition:opacity 0.15s;width:100%;}
+.btn-primary:hover{opacity:0.85;}
+.key-link{font-size:10px;color:var(--text2);text-decoration:underline;cursor:pointer;}
+
+/* ── Chat screen ── */
+#chat-screen{flex:1;display:none;flex-direction:column;gap:8px;overflow:hidden;}
+#chat-screen.active{display:flex;}
+
+/* Date picker row */
+.date-row{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.date-row label{font-size:10px;color:var(--text2);letter-spacing:1px;}
+.date-inp{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:4px 7px;font-size:11px;color:var(--text-color);outline:none;color-scheme:light;-webkit-app-region:no-drag;}
+.date-inp:focus{border-color:var(--accent);}
+.reset-key{background:none;border:none;font-size:10px;color:var(--text2);cursor:pointer;padding:2px 4px;border-radius:4px;-webkit-app-region:no-drag;}
+.reset-key:hover{color:var(--accent);}
+
+/* Messages */
+#msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;}
+.msg{display:flex;flex-direction:column;gap:2px;}
+.msg-role{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);}
+.msg-body{font-size:12px;color:var(--text-color);line-height:1.6;background:var(--surface);
+  border-radius:8px;padding:8px 10px;border:1px solid var(--border);}
+.msg.user .msg-body{background:var(--accent);color:#fff;border-color:transparent;}
+.msg.user .msg-role{text-align:right;}
+.msg.ai .msg-body{background:var(--surface);}
+
+/* Action pills shown after AI reply */
+.actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px;}
+.pill{background:rgba(255,143,171,0.15);border:1px solid var(--accent);color:var(--accent);
+  border-radius:20px;padding:3px 10px;font-size:11px;cursor:pointer;transition:all 0.12s;-webkit-app-region:no-drag;}
+.pill:hover{background:var(--accent);color:#fff;}
+
+/* Typing indicator */
+.typing{display:flex;gap:4px;align-items:center;padding:8px 10px;background:var(--surface);
+  border-radius:8px;border:1px solid var(--border);width:fit-content;}
+.typing span{width:5px;height:5px;background:var(--text2);border-radius:50%;
+  animation:blink 1.2s infinite;display:block;}
+.typing span:nth-child(2){animation-delay:0.2s;}
+.typing span:nth-child(3){animation-delay:0.4s;}
+@keyframes blink{0%,80%,100%{opacity:0.2}40%{opacity:1}}
+
+/* Input row */
+.input-row{display:flex;gap:6px;flex-shrink:0;margin-top:6px;}
+.chat-inp{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:7px 10px;font-size:12px;color:var(--text-color);outline:none;
+  resize:none;font-family:inherit;line-height:1.4;max-height:80px;overflow-y:auto;
+  -webkit-user-select:text;user-select:text;}
+.chat-inp:focus{border-color:var(--accent);}
+.chat-inp::placeholder{color:var(--text2);}
+.send-btn{background:var(--accent);border:none;color:#fff;border-radius:8px;
+  width:32px;font-size:16px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;transition:opacity 0.12s;-webkit-app-region:no-drag;}
+.send-btn:hover{opacity:0.82;}
+.send-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* Quick prompts */
+.quick-row{display:flex;flex-wrap:wrap;gap:4px;flex-shrink:0;margin-bottom:4px;}
+.quick-btn{background:var(--surface);border:1px solid var(--border);color:var(--text2);
+  border-radius:14px;padding:3px 9px;font-size:10px;cursor:pointer;
+  transition:all 0.12s;-webkit-app-region:no-drag;}
+.quick-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="widget">
+  <div id="drag-bar">
+    <button class="dot-btn dot-close" id="btn-close"></button>
+    <button class="dot-btn dot-pin"   id="btn-pin"></button>
+    <button class="dot-btn dot-lock unlocked" id="btn-lock"></button>
+    <span class="drag-title" id="mod-title">AI 助手</span>
+    <div style="display:flex;gap:4px;-webkit-app-region:no-drag">
+      <button class="icon-btn" id="btn-settings">⚙</button>
+    </div>
+  </div>
+
+  <div id="main-area">
+    <!-- API Key 设置界面 -->
+    <div id="key-screen">
+      <div class="key-icon">✨</div>
+      <div class="key-title">连接 AI 助手</div>
+      <div class="key-desc">
+        输入你的 Anthropic API Key<br>
+        自动生成待办、备忘录和日程安排<br>
+        Key 加密存储在本地，不会上传
+      </div>
+      <input class="key-inp" id="key-inp" type="password" placeholder="sk-ant-api03-...">
+      <button class="btn-primary" id="key-save-btn">连接</button>
+      <span class="key-link" onclick="openConsole()">申请 API Key → console.anthropic.com</span>
+    </div>
+
+    <!-- 对话界面 -->
+    <div id="chat-screen">
+      <div class="date-row">
+        <label>日期</label>
+        <input type="date" class="date-inp" id="target-date">
+        <button class="reset-key" id="reset-key-btn">更换 Key</button>
+      </div>
+      <div class="quick-row" id="quick-row"></div>
+      <div id="msgs"></div>
+      <div class="input-row">
+        <textarea class="chat-inp" id="chat-inp" rows="1" placeholder="说什么都可以，比如「帮我规划明天的工作」"></textarea>
+        <button class="send-btn" id="send-btn">↑</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── Config sync ─────────────────────────────────────────────
+let CFG = {
+  theme:'light', accent:'#FF8FAB', accent2:'#FFB347',
+  opacity:88, font:'Microsoft YaHei', fontSize:13, lang:'zh', textColor:'#1a1a2e'
+};
+function hexToRgba(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;}
+async function loadCFG(){
+  try{const s=await window.api?.getConfig();if(s)CFG=Object.assign(CFG,s);}catch{}
+  applyCFG();
+}
+function applyCFG(){
+  const r=document.documentElement.style,isDark=CFG.theme==='dark';
+  r.setProperty('--accent',CFG.accent||'#FF8FAB');
+  r.setProperty('--accent2',CFG.accent2||'#FFB347');
+  r.setProperty('--border-hover',hexToRgba(CFG.accent2||'#FFB347',0.55));
+  const op=(CFG.opacity||88)/100;
+  const tc=CFG.textColor||(isDark?'#f0eee8':'#1a1a2e');
+  r.setProperty('--text-color',tc);
+  if(isDark){
+    r.setProperty('--card-bg',`rgba(22,22,34,${op})`);r.setProperty('--surface',`rgba(30,30,46,${op})`);
+    r.setProperty('--border','rgba(255,255,255,0.09)');r.setProperty('--text','#f0eee8');r.setProperty('--text2','#8a8aa8');
+  }else{
+    r.setProperty('--card-bg',`rgba(255,255,255,${op})`);r.setProperty('--surface',`rgba(248,246,243,${op})`);
+    r.setProperty('--border','rgba(0,0,0,0.09)');r.setProperty('--text','#1a1a2e');r.setProperty('--text2','#8888aa');
+  }
+  document.body.style.fontFamily=`'${CFG.font||'Microsoft YaHei'}','PingFang SC','Segoe UI',sans-serif`;
+  document.body.style.fontSize=(CFG.fontSize||13)+'px';
+  updateI18n();
+}
+window.api?.onSettingsChanged(s=>{CFG=Object.assign(CFG,s);applyCFG();});
+
+// ─── i18n ─────────────────────────────────────────────────────
+const AI_I18N = {
+  zh:{
+    title:'AI 助手',
+    key_title:'连接 AI 助手',
+    key_desc:'输入 Anthropic API Key\n自动生成待办、备忘录和日程安排\nKey 加密存储在本地，不会上传',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'连接',
+    key_link:'申请 Key → console.anthropic.com',
+    date_label:'日期',
+    reset_key:'更换 Key',
+    input_placeholder:'说什么都可以，比如「帮我规划明天的工作」',
+    quick:['📋 规划今天任务','📝 写一条备忘','⏰ 设置提醒','💡 给我一个想法'],
+    you:'你',
+    ai:'AI',
+    thinking:'思考中…',
+    err:'请求失败，请检查 API Key 是否正确',
+    add_todos:'添加到待办',
+    add_memo:'保存为备忘',
+    done_todos:'✓ 已添加 {n} 条待办',
+    done_memo:'✓ 备忘已保存',
+    lock:'锁定',unlock:'解锁',pin:'置顶',unpin:'取消置顶',close:'关闭',settings:'设置',
+  },
+  en:{
+    title:'AI Assistant',
+    key_title:'Connect AI Assistant',
+    key_desc:'Enter your Anthropic API Key\nAuto-generate to-dos, memos and schedules\nKey is encrypted and stored locally',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'Connect',
+    key_link:'Get a key → console.anthropic.com',
+    date_label:'Date',
+    reset_key:'Change Key',
+    input_placeholder:'e.g. "Plan my work for tomorrow"',
+    quick:['📋 Plan today','📝 Write a memo','⏰ Set reminder','💡 Give me an idea'],
+    you:'You',ai:'AI',thinking:'Thinking…',err:'Request failed. Check your API Key.',
+    add_todos:'Add to To-Do',add_memo:'Save as Memo',
+    done_todos:'✓ Added {n} tasks',done_memo:'✓ Memo saved',
+    lock:'Lock',unlock:'Unlock',pin:'Pin',unpin:'Unpin',close:'Close',settings:'Settings',
+  },
+  ja:{
+    title:'AIアシスタント',
+    key_title:'AI接続',
+    key_desc:'Anthropic APIキーを入力\nタスク・メモ・スケジュールを自動生成\nキーはローカルに暗号化保存',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'接続',
+    key_link:'キー取得 → console.anthropic.com',
+    date_label:'日付',reset_key:'キー変更',
+    input_placeholder:'例：「明日の仕事を計画して」',
+    quick:['📋 今日の計画','📝 メモを書く','⏰ リマインダー','💡 アイデア'],
+    you:'あなた',ai:'AI',thinking:'考え中…',err:'エラー。APIキーを確認してください。',
+    add_todos:'タスクに追加',add_memo:'メモに保存',
+    done_todos:'✓ {n}件追加',done_memo:'✓ メモ保存済',
+    lock:'ロック',unlock:'解除',pin:'固定',unpin:'固定解除',close:'閉じる',settings:'設定',
+  },
+  ko:{
+    title:'AI 어시스턴트',
+    key_title:'AI 연결',
+    key_desc:'Anthropic API Key 입력\n할 일·메모·일정 자동 생성\nKey는 로컬에 암호화 저장',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'연결',
+    key_link:'키 받기 → console.anthropic.com',
+    date_label:'날짜',reset_key:'키 변경',
+    input_placeholder:'예: "내일 업무 계획 세워줘"',
+    quick:['📋 오늘 계획','📝 메모 작성','⏰ 알림 설정','💡 아이디어'],
+    you:'나',ai:'AI',thinking:'생각 중…',err:'오류. API Key를 확인하세요.',
+    add_todos:'할 일 추가',add_memo:'메모로 저장',
+    done_todos:'✓ {n}개 추가됨',done_memo:'✓ 메모 저장됨',
+    lock:'잠금',unlock:'해제',pin:'고정',unpin:'해제',close:'닫기',settings:'설정',
+  },
+  fr:{
+    title:'Assistant IA',
+    key_title:'Connecter l\'IA',
+    key_desc:'Entrez votre clé API Anthropic\nGénération auto de tâches, mémos et agenda\nClé chiffrée et stockée localement',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'Connecter',
+    key_link:'Obtenir une clé → console.anthropic.com',
+    date_label:'Date',reset_key:'Changer clé',
+    input_placeholder:'Ex : « Planifie ma journée de demain »',
+    quick:['📋 Planifier aujourd\'hui','📝 Écrire un mémo','⏰ Rappel','💡 Idée'],
+    you:'Vous',ai:'IA',thinking:'Réflexion…',err:'Erreur. Vérifiez votre clé API.',
+    add_todos:'Ajouter aux tâches',add_memo:'Sauver comme mémo',
+    done_todos:'✓ {n} tâches ajoutées',done_memo:'✓ Mémo sauvegardé',
+    lock:'Verrouiller',unlock:'Déverrouiller',pin:'Épingler',unpin:'Désépingler',close:'Fermer',settings:'Paramètres',
+  },
+  es:{
+    title:'Asistente IA',
+    key_title:'Conectar IA',
+    key_desc:'Introduce tu clave API Anthropic\nGeneración automática de tareas, memos y agenda\nClave cifrada y almacenada localmente',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'Conectar',
+    key_link:'Obtener clave → console.anthropic.com',
+    date_label:'Fecha',reset_key:'Cambiar clave',
+    input_placeholder:'Ej: «Planifica mi trabajo de mañana»',
+    quick:['📋 Planificar hoy','📝 Escribir memo','⏰ Recordatorio','💡 Idea'],
+    you:'Tú',ai:'IA',thinking:'Pensando…',err:'Error. Verifica tu clave API.',
+    add_todos:'Añadir a tareas',add_memo:'Guardar como memo',
+    done_todos:'✓ {n} tareas añadidas',done_memo:'✓ Memo guardado',
+    lock:'Bloquear',unlock:'Desbloquear',pin:'Fijar',unpin:'Desfijar',close:'Cerrar',settings:'Ajustes',
+  },
+  it:{
+    title:'Assistente IA',
+    key_title:'Connetti IA',
+    key_desc:'Inserisci la tua chiave API Anthropic\nGenerazione automatica di attività, memo e agenda\nChiave cifrata e salvata localmente',
+    key_placeholder:'sk-ant-api03-...',
+    key_btn:'Connetti',
+    key_link:'Ottieni chiave → console.anthropic.com',
+    date_label:'Data',reset_key:'Cambia chiave',
+    input_placeholder:'Es: «Pianifica il mio lavoro di domani»',
+    quick:['📋 Pianifica oggi','📝 Scrivi memo','⏰ Promemoria','💡 Idea'],
+    you:'Tu',ai:'IA',thinking:'In elaborazione…',err:'Errore. Verifica la tua chiave API.',
+    add_todos:'Aggiungi attività',add_memo:'Salva come memo',
+    done_todos:'✓ {n} attività aggiunte',done_memo:'✓ Memo salvato',
+    lock:'Blocca',unlock:'Sblocca',pin:'Fissa',unpin:'Rimuovi',close:'Chiudi',settings:'Impostazioni',
+  },
+};
+function L(key,vars={}){
+  const lang=CFG.lang||'zh';
+  const map=AI_I18N[lang]||AI_I18N.zh;
+  let s=map[key]||(AI_I18N.zh[key]||key);
+  Object.entries(vars).forEach(([k,v])=>s=s.replace('{'+k+'}',v));
+  return s;
+}
+function updateI18n(){
+  document.getElementById('mod-title').textContent=L('title');
+  // Key screen
+  const ks=document.getElementById('key-screen');
+  if(ks){
+    const t=ks.querySelector('.key-title');if(t)t.textContent=L('key_title');
+    const d=ks.querySelector('.key-desc');if(d)d.textContent=L('key_desc');
+    const inp=document.getElementById('key-inp');if(inp)inp.placeholder=L('key_placeholder');
+    const btn=document.getElementById('key-save-btn');if(btn)btn.textContent=L('key_btn');
+  }
+  // Chat screen
+  const dl=document.querySelector('.date-row label');if(dl)dl.textContent=L('date_label');
+  const rk=document.getElementById('reset-key-btn');if(rk)rk.textContent=L('reset_key');
+  const ci=document.getElementById('chat-inp');if(ci)ci.placeholder=L('input_placeholder');
+  // Quick prompts
+  renderQuickPrompts();
+  // Button titles
+  const pinned_=document.getElementById('btn-pin')?.classList.contains('off')===false;
+  const locked_=document.getElementById('widget')?.classList.contains('frozen');
+  const bp=document.getElementById('btn-pin');if(bp)bp.title=pinned_?L('unpin'):L('pin');
+  const bl=document.getElementById('btn-lock');if(bl)bl.title=locked_?L('unlock'):L('lock');
+  const bc=document.getElementById('btn-close');if(bc)bc.title=L('close');
+  const bs=document.getElementById('btn-settings');if(bs)bs.title=L('settings');
+}
+function renderQuickPrompts(){
+  const row=document.getElementById('quick-row');if(!row)return;
+  row.innerHTML='';
+  L('quick').forEach(q=>{
+    const b=document.createElement('button');b.className='quick-btn';b.textContent=q;
+    b.addEventListener('click',()=>{
+      document.getElementById('chat-inp').value=q;
+      sendMsg();
+    });
+    row.appendChild(b);
+  });
+}
+
+// ─── Titlebar ─────────────────────────────────────────────────
+document.getElementById('btn-close').addEventListener('click',()=>window.api?.winHide('ai'));
+let pinned=true;
+document.getElementById('btn-pin').addEventListener('click',()=>{
+  pinned=!pinned;
+  document.getElementById('btn-pin').classList.toggle('off',!pinned);
+  window.api?.winPin('ai',pinned);
+  updateI18n();
+});
+let locked=false;
+document.getElementById('btn-lock').addEventListener('click',()=>{
+  locked=!locked;
+  document.getElementById('btn-lock').classList.toggle('unlocked',!locked);
+  document.getElementById('widget').classList.toggle('frozen',locked);
+  updateI18n();
+});
+document.getElementById('btn-settings').addEventListener('click',()=>window.api?.openSettings());
+
+// ─── Date ─────────────────────────────────────────────────────
+function todayKey(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;}
+function pad(n){return String(n).padStart(2,'0');}
+
+// ─── Data helpers ─────────────────────────────────────────────
+async function getD(){try{return await window.api?.getData()||{todos:{},memos:{},alarms:[]};}catch{return{todos:{},memos:{},alarms:[]};}}
+async function setD(d){try{await window.api?.setData(d);}catch{}}
+
+// ─── API key ──────────────────────────────────────────────────
+let apiKey='';
+async function loadKey(){
+  try{apiKey=await window.api?.getApiKey()||'';}catch{}
+  if(apiKey) showChat(); else showKeyScreen();
+}
+function showKeyScreen(){
+  document.getElementById('key-screen').style.display='flex';
+  document.getElementById('chat-screen').classList.remove('active');
+}
+function showChat(){
+  document.getElementById('key-screen').style.display='none';
+  document.getElementById('chat-screen').classList.add('active');
+  document.getElementById('target-date').value=todayKey();
+  renderQuickPrompts();
+}
+document.getElementById('key-save-btn').addEventListener('click',async()=>{
+  const k=document.getElementById('key-inp').value.trim();
+  if(!k||!k.startsWith('sk-ant')){
+    document.getElementById('key-inp').style.borderColor='#ff5f57';
+    setTimeout(()=>document.getElementById('key-inp').style.borderColor='',1500);
+    return;
+  }
+  apiKey=k;
+  await window.api?.setApiKey(k);
+  showChat();
+});
+document.getElementById('key-inp').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('key-save-btn').click();});
+document.getElementById('reset-key-btn').addEventListener('click',()=>{
+  apiKey='';window.api?.setApiKey('');
+  document.getElementById('key-inp').value='';
+  showKeyScreen();
+});
+function openConsole(){ /* open in default browser via shell */ }
+
+// ─── Chat ─────────────────────────────────────────────────────
+let history=[]; // [{role,content}]
+
+function addMsg(role,html,pills=[]){
+  const msgs=document.getElementById('msgs');
+  const div=document.createElement('div');div.className=`msg ${role}`;
+  const roleEl=document.createElement('div');roleEl.className='msg-role';
+  roleEl.textContent=role==='user'?L('you'):L('ai');
+  const body=document.createElement('div');body.className='msg-body';
+  body.innerHTML=html;
+  div.appendChild(roleEl);div.appendChild(body);
+  if(pills.length){
+    const acts=document.createElement('div');acts.className='actions';
+    pills.forEach(p=>{
+      const btn=document.createElement('button');btn.className='pill';btn.textContent=p.label;
+      btn.addEventListener('click',p.action);acts.appendChild(btn);
+    });
+    div.appendChild(acts);
+  }
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+function addTyping(){
+  const msgs=document.getElementById('msgs');
+  const div=document.createElement('div');div.className='msg ai';
+  const roleEl=document.createElement('div');roleEl.className='msg-role';roleEl.textContent=L('ai');
+  const body=document.createElement('div');body.className='typing';
+  body.innerHTML='<span></span><span></span><span></span>';
+  div.appendChild(roleEl);div.appendChild(body);msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+function removeEl(el){if(el&&el.parentNode)el.parentNode.removeChild(el);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+
+async function sendMsg(){
+  const inp=document.getElementById('chat-inp');
+  const text=inp.value.trim();if(!text)return;
+  const date=document.getElementById('target-date').value||todayKey();
+
+  inp.value='';inp.style.height='';
+  document.getElementById('send-btn').disabled=true;
+
+  addMsg('user',esc(text));
+  history.push({role:'user',content:text});
+
+  const typing=addTyping();
+
+  // System prompt: instruct Claude to return structured JSON
+  const systemPrompt=`你是 DayCal 桌面日历的 AI 助手。用户正在为日期 ${date} 规划任务。
+请根据用户的请求，用JSON格式回复，格式如下：
+{
+  "reply": "对用户的自然语言回复（简洁友好）",
+  "todos": ["任务1", "任务2"],   // 如有待办事项，列出来；没有则为空数组
+  "memo": ""                       // 如果有备忘录内容则填写；没有则为空字符串
+}
+只输出JSON，不要有其他文字。todos数组中每条不超过30字。`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:systemPrompt,
+        messages:history
+      })
+    });
+
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({}));
+      throw new Error(err.error?.message||`HTTP ${resp.status}`);
+    }
+
+    const data=await resp.json();
+    const raw=data.content?.[0]?.text||'{}';
+    let parsed={reply:'',todos:[],memo:''};
+    try{
+      // Strip markdown fences if present
+      const clean=raw.replace(/```json|```/g,'').trim();
+      parsed=JSON.parse(clean);
+    }catch{parsed={reply:raw,todos:[],memo:''};}
+
+    history.push({role:'assistant',content:raw});
+
+    removeEl(typing);
+
+    // Build action pills
+    const pills=[];
+    if(parsed.todos?.length){
+      pills.push({
+        label:`${L('add_todos')} (${parsed.todos.length})`,
+        action:async()=>{
+          const D=await getD();
+          if(!D.todos[date])D.todos[date]=[];
+          parsed.todos.forEach(t=>D.todos[date].push({id:Math.random().toString(36).slice(2),text:t,done:false}));
+          await setD(D);
+          showToast(L('done_todos',{n:parsed.todos.length}));
+        }
+      });
+    }
+    if(parsed.memo?.trim()){
+      pills.push({
+        label:L('add_memo'),
+        action:async()=>{
+          const D=await getD();
+          D.memos[date]=(D.memos[date]?D.memos[date]+'\n':'')+parsed.memo.trim();
+          await setD(D);
+          showToast(L('done_memo'));
+        }
+      });
+    }
+
+    addMsg('ai', esc(parsed.reply||''), pills);
+
+  }catch(e){
+    removeEl(typing);
+    addMsg('ai',`<span style="color:#ff5f57">${L('err')}<br><small>${esc(e.message)}</small></span>`);
+  }
+
+  document.getElementById('send-btn').disabled=false;
+  inp.focus();
+}
+
+document.getElementById('send-btn').addEventListener('click',sendMsg);
+document.getElementById('chat-inp').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}
+});
+// Auto-resize textarea
+document.getElementById('chat-inp').addEventListener('input',function(){
+  this.style.height='auto';
+  this.style.height=Math.min(this.scrollHeight,80)+'px';
+});
+
+// ─── Toast ────────────────────────────────────────────────────
+function showToast(msg){
+  const t=document.createElement('div');
+  Object.assign(t.style,{
+    position:'fixed',bottom:'12px',left:'50%',transform:'translateX(-50%)',
+    background:CFG.accent||'#FF8FAB',color:'#fff',borderRadius:'20px',
+    padding:'6px 16px',fontSize:'11px',zIndex:'9999',
+    animation:'none',whiteSpace:'nowrap',
+    boxShadow:'0 4px 16px rgba(0,0,0,0.2)'
+  });
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+async function init(){
+  await loadCFG();
+  await loadKey();
+  updateI18n();
+}
+init();
+</script>
+</body>
+</html>
